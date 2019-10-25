@@ -4,3 +4,15 @@ author: "Jake Epstein"
 date: "10/25/2019"
 output: html_document
 ---
+
+```{r}
+library(haven)
+
+```
+
+
+```{r}
+debit = read_dta("data/debitcard199598.dta")
+
+
+```
