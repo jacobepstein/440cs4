@@ -1,0 +1,445 @@
+---
+title: "example_code"
+author: "Jake Epstein"
+date: "10/25/2019"
+output: html_document
+---
+
+```{r}
+library(ggplot2)
+#library(mgcv)
+library(Matching)
+library(xtable)
+
+rhc.data<-read.table("rhc.txt")
+
+#Check Missing Values
+any(unlist(lapply(rhc.data,FUN=function(x){any(is.na(x))})))
+
+
+#Continuous Variables
+names(which(unlist(lapply(rhc.data,class))=="numeric"))
+names(which(unlist(lapply(rhc.data,class))=="integer"))
+#Categorical Variables
+names(which(unlist(lapply(rhc.data[,c(-1,-54)],class))=="logical"))
+names(which(unlist(lapply(rhc.data,class))=="factor"))
+
+n_indi<-c(which(unlist(lapply(rhc.data,class))=="numeric"),which(unlist(lapply(rhc.data,class))=="integer"))
+c_indi<-c(which(unlist(lapply(rhc.data[,c(-1,-54)],class))=="logical"),which(unlist(lapply(rhc.data,class))=="factor"))
+
+
+#Descriptive Comparison
+data_t<-subset(rhc.data,treatment==1)
+data_c<-subset(rhc.data,treatment==0)
+size_t<-dim(data_t)[1]
+size_c<-dim(data_c)[1]
+
+#Calculate ASD for Continuous Variables
+dif1<-apply(data.matrix(data_t[,n_indi]),2,mean)-
+  apply(data.matrix(data_c[,n_indi]),2,mean)
+
+sd1<-sqrt(apply(data.matrix(data_t[,n_indi]),2,var)/size_t+
+      apply(data.matrix(data_c[,n_indi]),2,var)/size_c)
+
+ASD_1<-dif1/sd1;boxplot(ASD_1)
+
+ASD<-data.frame(mean=dif1,sd=sd1,asd=ASD_1)
+pdf("asd.pdf",width=8,height=6)
+ggplot(data=ASD,aes(x=names(ASD_1),y=asd,ymin=asd,ymax=asd))+geom_pointrange()+
+  geom_hline(yintercept = 0,lty=2)+coord_flip()+xlab("Variables")+ylab("Standardized Difference")
+dev.off()
+
+##############################################
+# Regression adjustment 1: without matching ##
+##############################################
+
+########################################################################## 
+###Note: Here I use the simple GLM for the regression adjustment model.  #
+###For more flexible outcome model, one can use things like splines      #
+###(e.g. the "gam" function in the "mgcv" package)                       #
+##########################################################################
+
+outcomeformula = function()
+{
+  return(dth30 ~ age + sex + race + edu + income + 
+          ninsclas + cat1 + cat2 + resp + card + neuro + gastr + renal + meta +
+          hema + seps + trauma + das2d3pc + dnr1 + ca + surv2md1 +
+          aps1 + scoma1 + wtkilo1 + temp1 + meanbp1 + resp1 + hrt1 + pafi1 + 
+          paco21 + ph1 + wblc1 + hema1 + sod1 + pot1 + crea1 + bili1 + alb1 + 
+          cardiohx + chfhx + dementhx + psychhx + chrpulhx + renalhx + 
+          liverhx + gibledhx + malighx + immunhx + transhx + amihx + wt0 + ortho)
+}
+
+model_control<-glm(outcomeformula, data=data_c,family=binomial(link="logit"))
+model_treated<-glm(outcomeformula, data=data_t,family=binomial(link="logit"))
+
+
+#model_control<-glm(
+#  as.formula(paste(colnames(rhc.data)[54], "~",
+#                   paste(colnames(rhc.data)[c_indi], collapse = "+"),"+",
+#                   paste(paste("s(",colnames(rhc.data)[n_indi],")",sep=""),collapse="+"),
+#                   sep = ""
+#  )),
+#  data=data_c,family=binomial(link="logit")
+#)
+
+
+#model_treated<-glm(
+#  as.formula(paste(colnames(rhc.data)[54], "~",
+#                   paste(colnames(rhc.data)[c_indi], collapse = "+"),"+",
+#                   paste(paste("s(",colnames(rhc.data)[n_indi],")",sep=""),collapse="+"),
+#                   sep = ""
+#  )),
+#  data=data_t,family=binomial(link="logit")
+#)
+
+ATE_1<-(sum(data_t$dth30-predict(model_control,newdata = data_t,type="response"))-
+  sum(data_c$dth30-predict(model_treated,newdata = data_c,type="response")))/dim(rhc.data)[1]
+
+ATT_1<-mean(data_t$dth30-predict(model_control,newdata = data_t,type="response"))
+
+######################################
+#Calculate variance via Delta Method #
+######################################
+
+X=predict(model_control,newdata=data_t,type='lpmatrix')
+c=coef(model_control)
+w=exp(-X%*%c)/((1+exp(-X%*%c))^2)
+h=apply(X,2,FUN=function(x){sum(x*w)})
+VAR_T<-t(h)%*%vcov(model_control,freq=T)%*%h
+
+X=predict(model_treated,newdata=data_c,type='lpmatrix')
+t=coef(model_treated)
+w=exp(-X%*%t)/((1+exp(-X%*%t))^2)
+h=apply(X,2,FUN=function(x){sum(x*w)})
+VAR_C<-t(h)%*%vcov(model_treated,freq=T)%*%h
+ATE_VAR_reg=VAR_T/dim(rhc.data)[1]^2+VAR_C/dim(rhc.data)[1]^2+
+  var(rhc.data$dth30)/dim(rhc.data)[1]
+#Standard Deviation of ATE
+sqrt(ATE_VAR_reg)
+
+#Standard Deviation of ATT
+ATT_VAR_reg= var(data_t$dth30)/dim(data_t)[1]+VAR_T/dim(data_t)[1]^2
+sqrt(ATT_VAR_reg)
+
+
+###########################
+#Propensity Score Methods #
+###########################
+
+###########################################
+#Stage 1: Estimate PS using logistic model#
+###########################################
+
+propscoreformula = function()
+{
+  return(treatment ~ age + sex + race + edu + income + 
+          ninsclas + cat1 + cat2 + resp + card + neuro + gastr + renal + meta +
+          hema + seps + trauma + das2d3pc + dnr1 + ca + surv2md1 +
+          aps1 + scoma1 + wtkilo1 + temp1 + meanbp1 + resp1 + hrt1 + pafi1 + 
+          paco21 + ph1 + wblc1 + hema1 + sod1 + pot1 + crea1 + bili1 + alb1 + 
+          cardiohx + chfhx + dementhx + psychhx + chrpulhx + renalhx + 
+          liverhx + gibledhx + malighx + immunhx + transhx + amihx + wt0 + ortho)
+}
+
+
+first_model<-glm(as.formula(paste(colnames(rhc.data)[1], "~",
+                                   paste(colnames(rhc.data)[c_indi], collapse = "+"),"+",
+                                   paste(paste("s(",colnames(rhc.data)[n_indi],")",sep=""),collapse="+"),
+                                   sep = ""
+)),family = binomial(link="logit"),data=rhc.data
+)
+
+rhc.data.pro<-rhc.data
+rhc.data.pro$ps<-fitted(first_model)
+
+################################
+#draw overlaid histogram of PS #
+################################
+
+a<-hist(rhc.data.pro$ps[which(rhc.data.pro$treatment==0)],breaks=50,freq=FALSE)
+a$counts<-a$counts/sum(a$counts)
+
+b<-hist(rhc.data.pro$ps[which(rhc.data.pro$treatment==1)],breaks=50,add=T)
+b$counts<-b$counts/sum(b$counts)
+
+pdf("prophist.pdf",width=8,height=6)
+plot(a,col=rgb(1,0,0,0.5),main="Overlap Check",cex.main=0.9,xlab="Estimated Propensity Score",ylab="Density",xlim=c(0,1))
+plot(b,add=TRUE,col=rgb(0,0,1,0.5),main="Overlap Check",xlab="Estimated Propensity Score",ylab="Density")
+legend("topright",legend=c("Control Group","Treatment Group"),col=c("red","blue"),pch=15,cex=0.7)
+dev.off()
+
+################################################
+#  Exclude samples in nonoverlapping region   ##
+################################################ 
+low_bound<-max(min(rhc.data.pro$ps[which(rhc.data.pro$treatment==1)]),
+               min(rhc.data.pro$ps[which(rhc.data.pro$treatment==0)]))
+
+up_bound<-min(max(rhc.data.pro$ps[which(rhc.data.pro$treatment==1)]),
+              max(rhc.data.pro$ps[which(rhc.data.pro$treatment==0)]))
+
+#Disgard the sample out of the common support
+olp.rhc.data<-subset(rhc.data.pro,rhc.data.pro$ps>=low_bound&rhc.data.pro$ps<=up_bound)
+
+######################################
+##PS Stage 2: estimate causal effect #
+######################################
+
+#####################################
+#Option 1: Matching with Replacement#
+#####################################
+
+ATE_matching_m<-Match(Y=olp.rhc.data$dth30,Tr=olp.rhc.data$treatment,estimand = "ATE",
+                  X=data.matrix(olp.rhc.data[,-c(1,54,55)]),M=6,Weight = 1)
+
+ATT_matching_m<-Match(Y=olp.rhc.data$dth30,Tr=olp.rhc.data$treatment,estimand = "ATT",
+                      X=data.matrix(olp.rhc.data[,-c(1,54,55)]),M=6,Weight = 1)
+                      
+######################################
+#Balance Check: defends on the method#
+######################################
+treated<-unique(ATT_matching_m$index.treated)
+control<-ATT_matching_m$index.control
+treat_size<-length(treated)
+control_size<-dim(olp.rhc.data)[1]-treat_size
+
+
+#ASD: absolute standardized difference. original data
+ori_d<-apply(data.matrix(rhc.data[,-c(1,54,55)]),MARGIN=2,FUN=function(x){
+  abs(mean(x[rhc.data$treatment==1])-mean(x[rhc.data$treatment==0]))})
+sd<-apply(data.matrix(rhc.data[,-c(1,54,55)]),MARGIN=2,FUN=function(x)
+{sqrt(var(x[rhc.data$treatment==1])/sum(rhc.data$treatment)+var(x[rhc.data$treatment==0])/sum(1-rhc.data$treatment))})
+ori_asd<-ori_d/sd
+
+
+olp_sd<-apply(data.matrix(olp.rhc.data[,-c(1,54,55)]),MARGIN=2,FUN=function(x)
+{sqrt(var(x[treated])/treat_size+var(x[-treated])/control_size)})
+
+#ASD: matching  
+
+match_d<-apply(data.matrix(olp.rhc.data[,-c(1,54,55)]),MARGIN=2,FUN=function(x)
+{abs(mean(x[treated])-mean(x[control]))})
+match_asd<-match_d/olp_sd
+
+
+#ASD: weighting
+ipw<-olp.rhc.data$ps/(1-olp.rhc.data$ps)
+ipw_d<-apply(data.matrix(olp.rhc.data[,-c(1,54,55)]),MARGIN=2,FUN=function(x){
+  abs(mean(x[treated])-sum(x[-treated]*ipw[-treated])/
+        sum(ipw[-treated]))})
+weight_asd<-ipw_d/olp_sd
+
+###########################################
+#ASD Comparison between methods: boxplot  #
+###########################################
+pdf("ASD_compare.pdf",width=8,height=6)
+boxplot(ori_asd,weight_asd,match_asd,main="ASD for Different Methods",names=c("original","weighting","matching"),
+        ylab="Abs Standardized Difference")
+dev.off()
+
+
+######################
+#Option 2: Weighting #
+######################
+
+#ATT IPW
+ATT_IPW<-mean(olp.rhc.data[treated,"dth30"])-sum(olp.rhc.data[-treated,"dth30"]*ipw[-treated])/sum(ipw[-treated])
+
+#ATE IPW
+ATE_IPW<-sum(olp.rhc.data[treated,"dth30"]/olp.rhc.data[treated,"ps"])/sum(1/olp.rhc.data[treated,"ps"])-
+  sum(olp.rhc.data[-treated,"dth30"]/(1-olp.rhc.data[-treated,"ps"]))/sum(1/(1-olp.rhc.data[-treated,"ps"]))
+
+#Double Robustness
+#ATT DR
+ATT_DR<-mean(olp.rhc.data[treated,"dth30"])-sum((olp.rhc.data$dth30*(1-olp.rhc.data$treatment)*
+                                             olp.rhc.data$ps+predict(model_control,newdata=olp.rhc.data,type="response")*
+                                               (olp.rhc.data$treatment-olp.rhc.data$ps))/(1-olp.rhc.data$ps))/treat_size
+#ATE DR
+ATE_DR<-mean(olp.rhc.data$treatment*olp.rhc.data$dth30/olp.rhc.data$ps)-
+    mean((olp.rhc.data$treatment-olp.rhc.data$ps)*predict(model_treated,newdata=olp.rhc.data,type="response")/olp.rhc.data$ps)-
+    mean((1-olp.rhc.data$treatment)*olp.rhc.data$dth30/(1-olp.rhc.data$ps))-
+    mean((olp.rhc.data$treatment-olp.rhc.data$ps)*predict(model_control,newdata=olp.rhc.data,type="response")/(1-olp.rhc.data$ps))
+    
+############################################
+#Regression Adjustment 2: on Matched Sample#
+############################################
+
+##############################################################
+### need to re-fit the regression model to the matched sample#
+##############################################################
+
+#model_control_m<-glm(outcomeformula, data=data_c,family=binomial(link="logit"))
+#model_treated_m<-glm(outcomeformula, data=data_t,family=binomial(link="logit"))
+
+
+#ATT
+mu1=predict(model_control,newdata=olp.rhc.data[control,],type="response")
+mu2=predict(model_control,newdata=olp.rhc.data[ATT_matching_m$index.treated,],type="response")
+ATT_mix=mean(olp.rhc.data[treated,"dth30"])-sum(olp.rhc.data[control,"dth30"]+mu2-mu1)/(6*treat_size)
+
+#ATE
+mu3=predict(model_control,newdata=olp.rhc.data[ATE_matching_m$index.control,],type="response")
+mu4=predict(model_control,newdata=olp.rhc.data[ATE_matching_m$index.treated,],type="response")
+mu5=predict(model_treated,newdata=olp.rhc.data[ATE_matching_m$index.control,],type="response")
+mu6=predict(model_treated,newdata=olp.rhc.data[ATE_matching_m$index.treated,],type="response")
+
+ATE_mix=ATE_matching_m$est-(-sum(mu3)+sum(mu4)-sum(mu5)+sum(mu6))/(6*dim(olp.rhc.data)[1])
+
+#################################
+#Bootstrap to Get the Variance  #
+#Takes time to run              #
+#################################
+ 
+B=200
+b_reg1<-b_reg2<-b_IPW1<-b_IPW2<-numeric(B)
+b_DR1<-b_DR2<-b_mix1<-b_mix2<-numeric(B)
+for (i in (1:B))
+{
+  #Resample Data
+  tryCatch({
+    b_index<-sample(1:dim(rhc.data)[1],size=dim(rhc.data)[1],replace = T)
+    bdata<-rhc.data[b_index,]
+    bdata$cat1<-NULL
+    bdata$cat2<-NULL
+    bn_indi<-c(which(unlist(lapply(bdata,class))=="numeric"),which(unlist(lapply(bdata,class))=="integer"))
+    bc_indi<-c(which(unlist(lapply(bdata[,c(-1,-52)],class))=="logical"),which(unlist(lapply(bdata,class))=="factor"))
+    
+    #Ensure both treatment and control group
+    if(var(bdata$treatment)>0)
+    {
+      #Direct Regression
+      b_control<-glm(
+          as.formula(paste(colnames(bdata)[52], "~",
+                           paste(colnames(bdata)[bc_indi], collapse = "+"),"+",
+                           paste(paste("s(",colnames(bdata)[bn_indi],")",sep=""),collapse="+"),
+                           sep = ""
+          )),
+          data=subset(bdata,treatment==0),family=binomial(link="logit")
+        )
+      
+      b_treated<-glm(
+        as.formula(paste(colnames(bdata)[52], "~",
+                         paste(colnames(bdata)[bc_indi], collapse = "+"),"+",
+                         paste(paste("s(",colnames(bdata)[bn_indi],")",sep=""),collapse="+"),
+                         sep = ""
+        )),
+        data=subset(bdata,treatment==1),family=binomial(link="logit")
+      )
+      
+      #ATT calculation:
+      b_reg1[i]<-sum(bdata[bdata$treatment==1,"dth30"]-predict(b_control,newdata=bdata[bdata$treatment==1,],type="response"))/sum(bdata$treatment)
+      #ATE Calculation:
+      b_reg2[i]<-(sum(subset(bdata,treatment==1)$dth30-predict(b_control,newdata = subset(bdata,treatment==1),type="response"))-
+          sum(subset(bdata,treatment==0)$dth30-predict(b_treated,newdata = subset(bdata,treatment==0),type="response")))/dim(bdata)[1]
+      
+      
+      #PS: Stage 1
+      b_model<-glm(as.formula(paste(colnames(bdata)[1], "~",
+                            paste(colnames(bdata)[bc_indi], collapse = "+"),"+",
+                            paste(paste("s(",colnames(bdata)[bn_indi],")",sep=""),collapse="+"),
+                            sep = ""
+      )),family = binomial(link="logit"),data=bdata
+      )
+      bdata$ps<-fitted(b_model)
+      
+      ###################################################
+      #Check Overlap: this step is not always necessary #
+      ###################################################  
+      low_b<-max(min(bdata$ps[which(bdata$treatment==1)]),
+                 min(bdata$ps[which(bdata$treatment==0)]))
+      
+      up_b<-min(max(bdata$ps[which(bdata$treatment==1)]),
+                max(bdata$ps[which(bdata$treatment==0)]))
+      bdata<-subset(bdata,bdata$ps>=low_b&bdata$ps<=up_b)
+      
+
+      #Matching
+      b_ATE_matching_m<-Match(Y=bdata$dth30,Tr=bdata$treatment,estimand = "ATE",
+                            X=data.matrix(bdata[,-c(1,52,53)]),M=6,Weight = 1)
+      
+      b_ATT_matching_m<-Match(Y=bdata$dth30,Tr=bdata$treatment,estimand = "ATT",
+                            X=data.matrix(bdata[,-c(1,52,53)]),M=6,Weight = 1)
+      
+      treated<-unique(b_ATT_matching_m$index.treated)
+      control<-b_ATT_matching_m$index.control
+      treat_size<-length(treated)
+      control_size<-dim(bdata)[1]-treat_size
+      
+      mu1=predict(b_control,newdata=bdata[control,],type="response")
+      mu2=predict(b_control,newdata=bdata[b_ATT_matching_m$index.treated,],type="response")
+      b_mix1[i]=mean(bdata[treated,"dth30"])-sum(bdata[control,"dth30"]+mu2-mu1)/(6*treat_size)
+      
+      #ATE: Matching with regression
+      mu3=predict(b_control,newdata=bdata[b_ATE_matching_m$index.control,],type="response")
+      mu4=predict(b_control,newdata=bdata[b_ATE_matching_m$index.treated,],type="response")
+      mu5=predict(b_treated,newdata=bdata[b_ATE_matching_m$index.control,],type="response")
+      mu6=predict(b_treated,newdata=bdata[b_ATE_matching_m$index.treated,],type="response")
+      
+      b_mix2[i]=b_ATE_matching_m$est-(-sum(mu3)+sum(mu4)-sum(mu5)+sum(mu6))/(6*dim(bdata)[1])
+      
+      #IPW
+      #Calculate Size
+      btreated<-(1:dim(bdata)[1])[bdata$treatment==1]
+      treat_size<-sum(bdata$treatment)
+      control_size<-dim(bdata)[1]-treat_size
+      
+      bipw<-bdata$ps/(1-bdata$ps)
+      b_IPW1[i]<-mean(bdata[btreated,"dth30"])-sum(bdata[-btreated,"dth30"]*bipw[-btreated])/sum(bipw[-btreated])
+      b_IPW2[i]<-sum(bdata[btreated,"dth30"]/bdata[btreated,"ps"])/sum(1/bdata[btreated,"ps"])-
+        sum(bdata[-btreated,"dth30"]/(1-bdata[-btreated,"ps"]))/sum(1/(1-bdata[-btreated,"ps"]))
+      
+      #DR
+      b_DR1[i]<-mean(bdata[btreated,"dth30"])-sum((bdata$dth30*(1-bdata$treatment)*
+                                                         bdata$ps+predict(b_control,newdata=bdata,type="response")*
+                                                         (bdata$treatment-bdata$ps))/(1-bdata$ps))/treat_size
+      #ATE DR
+      b_DR2[i]<-mean(bdata$treatment*bdata$dth30/bdata$ps)-
+        mean((bdata$treatment-bdata$ps)*predict(b_treated,newdata=bdata,type="response")/bdata$ps)-
+        mean((1-bdata$treatment)*bdata$dth30/(1-bdata$ps))-
+        mean((bdata$treatment-bdata$ps)*predict(b_control,newdata=bdata,type="response")/(1-bdata$ps))
+      print(paste("==",i,"=="))
+    }
+    else
+    {
+      b_IPW1[i]<-NA
+      b_DR1[i]<-NA
+      b_reg1[i]<-NA
+      b_IPW2[i]<-NA
+      b_DR2[i]<-NA
+      b_reg2[i]<-NA
+      print("non overlap")
+    }
+    #Catching the Error
+  },error=function(e){cat("ERROR:",conditionMessage(e),"\n")})
+  
+  
+}
+#Calculate Bootstrap Variance and SD
+ATT_SD_reg_boot<-sqrt(var(b_reg1))
+ATT_SD_IPW<-sqrt(var(b_IPW1))
+ATT_SD_DR<-sqrt(var(b_DR1))
+ATT_SD_Mix<-sqrt(var(b_mix1))
+
+ATE_SD_reg_boot<-sqrt(var(b_reg2))
+ATE_SD_IPW<-sqrt(var(b_IPW2))
+ATE_SD_DR<-sqrt(var(b_DR2))
+ATE_SD_Mix<-sqrt(var(b_mix2))
+
+
+xtable(rbind(c(ATE_1,ATE_mix,ATE_IPW,ATE_DR),
+c(ATE_SD_reg_boot,ATE_SD_Mix,ATE_SD_IPW,ATE_SD_DR),
+c(ATT_1,ATT_mix,ATT_IPW,ATT_DR),
+c(ATT_SD_reg_boot,ATT_SD_Mix,ATT_SD_IPW,ATT_SD_DR)),digits=4)
+
+
+#pdf("Residual_check.pdf",height=5,width=10)
+#par(mfrow=c(1,2))
+#plot(fitted(model_treated),residuals.gam(model_treated),ylab="residual",xlab="fitted value (Control Model)")
+#plot(fitted(model_control),residuals.gam(model_control),ylab="residual",xlab="fitted value (Treated Model)")
+#dev.off()
+ 
+
+
+
+
+```
