@@ -4,15 +4,202 @@ author: "Jake Epstein"
 date: "10/25/2019"
 output: html_document
 ---
+```{r, echo = FALSE, message = FALSE}
+knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE)
+```
 
 ```{r}
 library(haven)
-
+library(dplyr)
+library(ggplot2)
+library(gridExtra)
 ```
 
 
 ```{r}
+#load, clean data
 debit = read_dta("data/debitcard199598.dta")
+
+debit = debit %>%
+  mutate(average_age = factor(average_age, labels = c("<30", "31-40", "41-50", "51-65", "65+"))) %>% 
+  mutate(householder_age = factor(householder_age, labels = c("<30", "31-40", "41-50", "51-65", "65+"))) %>%
+  mutate(geograph_area = factor(geograph_area, labels = c("North", "Central Italy", "South and Islands"))) %>%
+  mutate(num_of_inhabitants = factor(num_of_inhabitants, labels = c("<20k", "20-40k", "40-500k", "500k+"))) %>%
+  mutate(householder_education = factor(householder_education, labels = c("None", "Elementary", "Middle School", "High School", "Bachelors", "Post-Graduate"))) %>%
+  mutate(spending1995 = as.numeric(spending1995), spending1998 = as.numeric(spending1998), debit_card1998 = as.logical(debit_card1998))
+```
+
+
+## Introduction
+
+[TODO: Add intro]
+
+
+## Exploratory Data Analysis
+
+[TODO: Format writeup, select plots]
+
+conclusions:
+
+* debit card households spend more in both 1995 and 1998
+* no real difference if considering straight up spending or spending as a percent of income or wealth
+* categorical variables don't appear to significant in determining spending
+* family size positively correlated with spending (duh)
+* higher educational status correlated with spending
+
+```{r}
+# simple spending, 95 v 98
+
+
+spend95 = ggplot(debit, aes(x = spending1995, fill = debit_card1998)) +
+  geom_density(alpha = 0.5) +
+  labs(title = "1995 Household Spending", fill = "Debit Card?", x = "Monthly Average Spending ($)", y = "Density") +
+  xlim(0, 5000)+
+  theme_minimal()
+
+spend98 = ggplot(debit, aes(x = spending1998, fill = debit_card1998)) +
+  geom_density(alpha = 0.5) +
+  labs(title = "1998 Household Spending", fill = "Debit Card?", x = "Monthly Average Spending ($)", y = "Density") +
+  xlim(0, 5000)+
+  theme_minimal()
+
+grid.arrange(spend95, spend98, nrow = 2)
+
+
+# spending as a % of income, wealth 1995 vs 1998
+
+debit = debit %>%
+  mutate(spend95_pct_income = spending1995 / income * 12 * 100) %>%
+  mutate(spend98_pct_income = spending1998 / income * 12 * 100) %>%
+  mutate(spend95_pct_wealth = spending1995 / wealth * 100) %>%
+  mutate(spend98_pct_wealth = spending1998 / wealth * 100)
+
+spend95_inc = ggplot(debit %>% filter(income > 0), aes(x = spend95_pct_income, fill = debit_card1998)) +
+  geom_density(alpha = 0.5) +
+  labs(title = "1995 Household Spending as a Percent of Income", fill = "Debit Card?", x = "Monthly Average Spending (% Income)", y = "Density") +
+  xlim(0, 125) +
+  theme_minimal()
+
+spend98_inc = ggplot(debit %>% filter(income > 0), aes(x = spend98_pct_income, fill = debit_card1998)) +
+  geom_density(alpha = 0.5) +
+  labs(title = "1998 Household Spending as a Percent of Income", fill = "Debit Card?", x = "Monthly Average Spending (% Income)", y = "Density") +
+  xlim(0, 125) +
+  theme_minimal()
+
+grid.arrange(spend95_inc, spend98_inc, nrow = 2)
+
+spend95_wealth = ggplot(debit %>% filter(wealth > 0), aes(x = spend95_pct_wealth, fill = debit_card1998)) +
+  geom_density(alpha = 0.5) +
+  labs(title = "1995 Household Spending as a Percent of Wealth", fill = "Debit Card?", x = "Monthly Average Spending (% Wealth)", y = "Density") +
+  xlim(0, 2.5) +
+  theme_minimal()
+
+spend98_wealth = ggplot(debit %>% filter(wealth > 0), aes(x = spend98_pct_wealth, fill = debit_card1998)) +
+  geom_density(alpha = 0.5) +
+  labs(title = "1998 Household Spending as a Percent of Wealth", fill = "Debit Card?", x = "Monthly Average Spending (% Wealth)", y = "Density") +
+  xlim(0, 2.5) +
+  theme_minimal()
+
+grid.arrange(spend95_wealth, spend98_wealth, nrow = 2)
+
+ggplot(debit, aes(x = spending1995, y = spending1998, color = debit_card1998))+
+  geom_point() +
+  theme_minimal() +
+  labs(x = "1995 Monthly Household Spending ($)", y = "1998 Monthly Household Spending ($)", fill = "Debit Card?",
+       title = "1995 vs 1998 Debit Card Use and Household Spending") +
+  geom_smooth(method = "lm")
 
 
 ```
+
+```{r}
+#compare spending by categorical variable
+
+ggplot(debit, aes(y = spending1998, x = debit_card1998, fill = debit_card1998)) +
+  geom_boxplot(width = .1, show.legend = FALSE) +
+  geom_violin(trim = TRUE, alpha = .5, show.legend = FALSE) +
+  theme_minimal() +
+  labs(y = "1998 Spending", x = "Debit Card")
+
+ggplot(debit, aes(y = spending1998, x = average_age, fill = average_age)) +
+  geom_boxplot(width = .1, show.legend = FALSE) +
+  geom_violin( alpha = .5, show.legend = FALSE) +
+  theme_minimal() +
+  labs(y = "1998 Spending", x = "Average Age")
+
+ggplot(debit, aes(y = spending1998, x = householder_age, fill = householder_age)) +
+  geom_boxplot(width = .1, show.legend = FALSE) +
+  geom_violin( alpha = .5, show.legend = FALSE) +
+  theme_minimal() +
+  labs(y = "1998 Spending", x = "Head of Household Age")
+
+ggplot(debit, aes(y = spending1998, x = geograph_area, fill = geograph_area)) +
+  geom_boxplot(width = .1, show.legend = FALSE) +
+  geom_violin( alpha = .5, show.legend = FALSE) +
+  theme_minimal() +
+  labs(y = "1998 Spending", x = "Geography")
+
+ggplot(debit, aes(y = spending1998, x = as.factor(family_size), fill = as.factor(family_size))) +
+  geom_boxplot(width = .1, show.legend = FALSE) +
+  geom_violin( alpha = .5, show.legend = FALSE) +
+  theme_minimal() +
+  labs(y = "1998 Spending", x = "Family Size")
+
+ggplot(debit, aes(y = spending1998, x = householder_education, fill = householder_education)) +
+  geom_boxplot(width = .1, show.legend = FALSE) +
+  geom_violin( alpha = .5, show.legend = FALSE) +
+  theme_minimal() +
+  labs(y = "1998 Spending", x = "Head of Household Education")
+
+ggplot(debit, aes(y = spending1998, x = num_of_inhabitants, fill = num_of_inhabitants)) +
+  geom_boxplot(width = .1, show.legend = FALSE) +
+  geom_violin( alpha = .5, show.legend = FALSE) +
+  theme_minimal() +
+  labs(y = "1998 Spending", x = "Number of Inhabitants")
+
+ggplot(debit %>% filter(wealth < 1e6), aes(y = wealth, x = householder_education, fill = householder_education)) +
+  geom_boxplot(width = .1, show.legend = FALSE) +
+  geom_violin( alpha = .5, show.legend = FALSE) +
+  theme_minimal() +
+  labs(y = "Wealth", x = "Head of Household Education")
+```
+
+```{r}
+###pct of income, no different than above
+# 
+# ggplot(debit %>% filter(income > 3000), aes(y = spend98_pct_income, x = debit_card1998, fill = debit_card1998)) +
+#   geom_boxplot(width = .1, show.legend = FALSE) +
+#   geom_violin(trim = TRUE, alpha = .5, show.legend = FALSE) +
+#   theme_minimal() +
+#   labs(y = "1998 Spending (% of Income)", x = "Debit Card")
+# 
+# ggplot(debit %>% filter(income > 3000), aes(y = spend98_pct_income, x = average_age, fill = average_age)) +
+#   geom_boxplot(width = .1, show.legend = FALSE) +
+#   geom_violin( alpha = .5, show.legend = FALSE) +
+#   theme_minimal() +
+#   labs(y = "1998 Spending (% of Income)", x = "Average Age")
+# 
+# ggplot(debit %>% filter(income > 3000), aes(y = spend98_pct_income, x = householder_age, fill = householder_age)) +
+#   geom_boxplot(width = .1, show.legend = FALSE) +
+#   geom_violin( alpha = .5, show.legend = FALSE) +
+#   theme_minimal() +
+#   labs(y = "1998 Spending (% of Income)", x = "Head of Household Age")
+# 
+# ggplot(debit %>% filter(income > 3000), aes(y = spend98_pct_income, x = geograph_area, fill = geograph_area)) +
+#   geom_boxplot(width = .1, show.legend = FALSE) +
+#   geom_violin( alpha = .5, show.legend = FALSE) +
+#   theme_minimal() +
+#   labs(y = "1998 Spending (% of Income)", x = "Geography")
+```
+
+
+## Data Balancing
+
+
+## Model Selection
+
+
+## Conclusions
+
+
+
