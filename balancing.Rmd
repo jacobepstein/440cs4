@@ -1,0 +1,67 @@
+---
+title: "balancing"
+output: html_document
+---
+
+```{r}
+library(haven)
+library(ggplot2)
+#library(mgcv)
+library(Matching)
+library(xtable)
+library(dplyr)
+
+```
+
+
+```{r}
+debit = read_dta("data/debitcard199598.dta")
+```
+
+```{r}
+#Check Missing Values
+any(unlist(lapply(debit,FUN=function(x){any(is.na(x))})))
+
+debit = debit %>%
+  mutate(num_of_earners = as.factor(num_of_earners)) %>%
+  mutate(family_size = as.factor(family_size)) %>%
+  mutate(average_age = as.factor(average_age)) %>%
+  mutate(geograph_area = as.factor(geograph_area)) %>%
+  mutate(num_of_inhabitants = as.factor(num_of_inhabitants)) %>%
+  mutate(householder_age = as.factor(householder_age)) %>%
+  mutate(householder_education = as.factor(householder_education)) %>%
+  mutate(debit_card1998 = as.factor(debit_card1998))
+  
+
+#Continuous Variables
+names(which(unlist(lapply(debit,class))=="numeric"))
+
+#Categorical Variables
+names(which(unlist(lapply(debit,class))=="factor"))
+
+n_indi<-c(which(unlist(lapply(debit,class))=="numeric"))
+c_indi<-c(which(unlist(lapply(debit,class))=="factor"))
+
+#Descriptive Comparison
+data_t<-subset(debit,debit_card1998==1)
+data_c<-subset(debit,debit_card1998==0)
+size_t<-dim(data_t)[1]
+size_c<-dim(data_c)[1]
+
+#Calculate ASD for Continuous Variables
+dif1<-apply(data.matrix(data_t[,n_indi]),2,mean)-
+  apply(data.matrix(data_c[,n_indi]),2,mean)
+
+sd1<-sqrt(apply(data.matrix(data_t[,n_indi]),2,var)/size_t+
+      apply(data.matrix(data_c[,n_indi]),2,var)/size_c)
+
+ASD_1<-dif1/sd1;boxplot(ASD_1)
+
+ASD<-data.frame(mean=dif1,sd=sd1,asd=ASD_1)
+pdf("asd.pdf",width=8,height=6)
+
+ggplot(data=ASD,aes(x=names(ASD_1),y=asd,ymin=asd,ymax=asd))+geom_pointrange()+
+  geom_hline(yintercept = 0,lty=2)+coord_flip()+xlab("Variables")+ylab("Standardized Difference")
+
+
+```
