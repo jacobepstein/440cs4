@@ -64,4 +64,27 @@ ggplot(data=ASD,aes(x=names(ASD_1),y=asd,ymin=asd,ymax=asd))+geom_pointrange()+
   geom_hline(yintercept = 0,lty=2)+coord_flip()+xlab("Variables")+ylab("Standardized Difference")
 
 
+model_control<-lm(spending1998 ~ spending1995 + num_of_earners + average_age + family_size + geograph_area + num_of_inhabitants + householder_age + householder_education + num_of_banks + interest_rate + income + wealth + cash_inventory, data=data_c)
+                  
+model_treated<-lm(spending1998 ~ spending1995 + num_of_earners + average_age + family_size + geograph_area + num_of_inhabitants + householder_age + householder_education + num_of_banks + interest_rate + income + wealth + cash_inventory, data=data_t)
+
+ATE_1<-(sum(data_t$spending1998-predict(model_control,newdata = data_t,type="response"))-
+  sum(data_c$spending1998-predict(model_treated,newdata = data_c,type="response")))/dim(debit)[1]
+
+
+ATT_1<-mean(data_t$spending1998-predict(model_control,newdata = data_t,type="response"))
+
+```
+
+```{r}
+#PS 
+
+propscoreformula = function()
+{
+
+return(debit_card1998 ~ spending1995 + num_of_earners + average_age + family_size + geograph_area +  num_of_inhabitants + householder_age + householder_education + num_of_banks + interest_rate + income + wealth + cash_inventory)
+  
+}
+
+
 ```
