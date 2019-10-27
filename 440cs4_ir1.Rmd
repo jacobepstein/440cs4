@@ -1,8 +1,10 @@
 ---
-title: "440cs4_ir1"
-author: "Jake Epstein"
-date: "10/25/2019"
-output: html_document
+title: "Case Study IV, Interim Report I"
+author: "Jake Epstein, Daniel Spottiswood, Man-Lin Hsiao, Michael Tan, Sahil Patel"
+date: "10/29/2019"
+output:
+  pdf_document: default
+  html_document: default
 ---
 ```{r, echo = FALSE, message = FALSE}
 knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE)
@@ -32,47 +34,64 @@ debit = debit %>%
 
 ## Introduction
 
-[TODO: Add intro]
+The goal of this case study is to evaluate the causal impact of debit card ownership on household spending. The data come from the Italy Survey on Household Income and Wealth (SHIW), a 1995-1998 survey of 584 Italian households. The dataset includes 1995 and 1998 monthly household spending, whether the household had exactly one debit card in 1998 and demographic information including family size, geographic region and average age. In this report, we will create a model to estimate the causal impact of debit card ownership on household spending, utilizing propensity score methods to ensure model balance.
 
 
 ## Exploratory Data Analysis
 
-[TODO: Format writeup, select plots]
 
-conclusions:
-
-* debit card households spend more in both 1995 and 1998
-* no real difference if considering straight up spending or spending as a percent of income or wealth
-* categorical variables don't appear to significant in determining spending
-* family size positively correlated with spending (duh)
-* higher educational status correlated with spending
-
-```{r}
+```{r, fig.width=15, fig.height=7}
 # simple spending, 95 v 98
 
 
 spend95 = ggplot(debit, aes(x = spending1995, fill = debit_card1998)) +
-  geom_density(alpha = 0.5) +
+  geom_density(alpha = 0.5, show.legend = FALSE) +
   labs(title = "1995 Household Spending", fill = "Debit Card?", x = "Monthly Average Spending ($)", y = "Density") +
   xlim(0, 5000)+
   theme_minimal()
 
 spend98 = ggplot(debit, aes(x = spending1998, fill = debit_card1998)) +
-  geom_density(alpha = 0.5) +
+  geom_density(alpha = 0.5, show.legend = FALSE) +
   labs(title = "1998 Household Spending", fill = "Debit Card?", x = "Monthly Average Spending ($)", y = "Density") +
   xlim(0, 5000)+
   theme_minimal()
 
-grid.arrange(spend95, spend98, nrow = 2)
+#change in spending over time
 
+debit = debit %>%
+  mutate(delta = spending1998-spending1995)
 
-# spending as a % of income, wealth 1995 vs 1998
+diff = ggplot(debit, aes(x = delta, fill = debit_card1998)) +
+  geom_density(alpha = 0.5) +
+  labs(title = "Change in Spending", fill = "Debit Card", x = "Change in Monthly Average Spending ($)", y = "Density") +
+  # xlim(0, 5000)+
+  theme_minimal()
+
+scatter = ggplot(debit, aes(x = spending1995, y = spending1998, color = debit_card1998))+
+  geom_point() +
+  theme_minimal() +
+  theme(legend.position = "none", legend.title = element_blank())+
+  labs(x = "1995 Monthly Household Spending ($)", y = "1998 Monthly Household Spending ($)", fill = "Debit Card?",
+       title = "1995 vs 1998 Debit Card Use and Household Spending") +
+  geom_smooth(method = "lm")
+
+grid.arrange(spend95, diff, spend98, scatter, nrow = 2)
+
 
 debit = debit %>%
   mutate(spend95_pct_income = spending1995 / income * 12 * 100) %>%
   mutate(spend98_pct_income = spending1998 / income * 12 * 100) %>%
   mutate(spend95_pct_wealth = spending1995 / wealth * 100) %>%
   mutate(spend98_pct_wealth = spending1998 / wealth * 100)
+
+```
+
+We begin our exploratory data analysis by looking at spending. In 1995 and 1998, households with debit cards tended to spend more than households without. The distribution of difference in household spending is centered at around 0, indicating most households spent about the same amount in 1998 as they did in 1995. The distribution of changes for households with debit cards has slighly more weight on the positive side, indicating that these households may have increased their spending slightly relative to non-debit card households. We also looked into spending as a percentage of income or of wealth, and the results were consistent with those above.
+
+```{r, include = FALSE}
+# no different -- don't include
+
+# spending as a % of income, wealth 1995 vs 1998
 
 spend95_inc = ggplot(debit %>% filter(income > 0), aes(x = spend95_pct_income, fill = debit_card1998)) +
   geom_density(alpha = 0.5) +
@@ -102,67 +121,116 @@ spend98_wealth = ggplot(debit %>% filter(wealth > 0), aes(x = spend98_pct_wealth
 
 grid.arrange(spend95_wealth, spend98_wealth, nrow = 2)
 
-ggplot(debit, aes(x = spending1995, y = spending1998, color = debit_card1998))+
-  geom_point() +
-  theme_minimal() +
-  labs(x = "1995 Monthly Household Spending ($)", y = "1998 Monthly Household Spending ($)", fill = "Debit Card?",
-       title = "1995 vs 1998 Debit Card Use and Household Spending") +
-  geom_smooth(method = "lm")
-
 
 ```
 
-```{r}
-#compare spending by categorical variable
+```{r, fig.width=15, fig.height=7}
+#categorical variables
 
-ggplot(debit, aes(y = spending1998, x = debit_card1998, fill = debit_card1998)) +
+
+spend_debit = ggplot(debit, aes(y = spending1998, x = debit_card1998, fill = debit_card1998)) +
   geom_boxplot(width = .1, show.legend = FALSE) +
   geom_violin(trim = TRUE, alpha = .5, show.legend = FALSE) +
   theme_minimal() +
   labs(y = "1998 Spending", x = "Debit Card")
 
-ggplot(debit, aes(y = spending1998, x = average_age, fill = average_age)) +
+# spend_debit #meh
+
+spend_age = ggplot(debit, aes(y = spending1998, x = average_age, fill = average_age)) +
   geom_boxplot(width = .1, show.legend = FALSE) +
   geom_violin( alpha = .5, show.legend = FALSE) +
   theme_minimal() +
   labs(y = "1998 Spending", x = "Average Age")
 
-ggplot(debit, aes(y = spending1998, x = householder_age, fill = householder_age)) +
+# spend_age #not super impactful
+
+spend_hhage = ggplot(debit, aes(y = spending1998, x = householder_age, fill = householder_age)) +
   geom_boxplot(width = .1, show.legend = FALSE) +
   geom_violin( alpha = .5, show.legend = FALSE) +
   theme_minimal() +
   labs(y = "1998 Spending", x = "Head of Household Age")
 
-ggplot(debit, aes(y = spending1998, x = geograph_area, fill = geograph_area)) +
+# spend_hhage #similar to avg age
+
+spend_geo = ggplot(debit, aes(y = spending1998, x = geograph_area, fill = geograph_area)) +
   geom_boxplot(width = .1, show.legend = FALSE) +
   geom_violin( alpha = .5, show.legend = FALSE) +
   theme_minimal() +
   labs(y = "1998 Spending", x = "Geography")
 
-ggplot(debit, aes(y = spending1998, x = as.factor(family_size), fill = as.factor(family_size))) +
+# spend_geo # meh
+
+spend_fam_size = ggplot(debit, aes(y = spending1998, x = as.factor(family_size), fill = as.factor(family_size))) +
   geom_boxplot(width = .1, show.legend = FALSE) +
   geom_violin( alpha = .5, show.legend = FALSE) +
   theme_minimal() +
   labs(y = "1998 Spending", x = "Family Size")
 
-ggplot(debit, aes(y = spending1998, x = householder_education, fill = householder_education)) +
+# spend_fam_size # intuitive trend
+
+spend_edu = ggplot(debit, aes(y = spending1998, x = householder_education, fill = householder_education)) +
   geom_boxplot(width = .1, show.legend = FALSE) +
   geom_violin( alpha = .5, show.legend = FALSE) +
   theme_minimal() +
   labs(y = "1998 Spending", x = "Head of Household Education")
 
-ggplot(debit, aes(y = spending1998, x = num_of_inhabitants, fill = num_of_inhabitants)) +
+# spend_edu # i like
+
+spend_inhab = ggplot(debit, aes(y = spending1998, x = num_of_inhabitants, fill = num_of_inhabitants)) +
   geom_boxplot(width = .1, show.legend = FALSE) +
   geom_violin( alpha = .5, show.legend = FALSE) +
   theme_minimal() +
   labs(y = "1998 Spending", x = "Number of Inhabitants")
 
-ggplot(debit %>% filter(wealth < 1e6), aes(y = wealth, x = householder_education, fill = householder_education)) +
-  geom_boxplot(width = .1, show.legend = FALSE) +
-  geom_violin( alpha = .5, show.legend = FALSE) +
+# spend_inhab # ubran spend more
+
+# ggplot(debit %>% filter(wealth < 1e6), aes(y = wealth, x = householder_education, fill = householder_education)) +
+#   geom_boxplot(width = .1, show.legend = FALSE) +
+#   geom_violin( alpha = .5, show.legend = FALSE) +
+#   theme_minimal() +
+#   labs(y = "Wealth", x = "Head of Household Education")
+
+
+# continuous relationships
+
+spend_wealth = ggplot(debit, aes(y = spending1998, x = wealth, color = debit_card1998))+
+  geom_point() +
   theme_minimal() +
-  labs(y = "Wealth", x = "Head of Household Education")
+  geom_smooth(method = "lm") +
+  labs(y = "1998 Spending", x = "Wealth", title = "Wealth vs. Spending")
+
+spend_inc = ggplot(debit, aes(y = spending1998, x = income, color = debit_card1998))+
+  geom_point() +
+  theme_minimal() +
+  geom_smooth(method = "lm") +
+  labs(y = "1998 Spending", x = "Income", title = "Income vs. Spending")
+
+# spend_inc # same as wealth
+
+spend_ir = ggplot(debit, aes(y = spending1998, x = interest_rate, color = debit_card1998))+
+  geom_point() +
+  theme_minimal() +
+  geom_smooth(method = "lm") +
+  ylim(0, 5000) +
+  labs(y = "1998 Spending", x = "Interest Rate", title = "Interest Rate vs. Spending")
+
+# spend_ir # no real relationship
+
+spend_banks = ggplot(debit %>% filter(num_of_banks < 500), aes(y = spending1998, x = num_of_banks, color = debit_card1998))+
+  geom_point() +
+  theme_minimal() +
+  geom_smooth(method = "lm") +
+  # ylim(0, 5000) +
+  labs(y = "1998 Spending", x = "Number of Banks", title = "Banks vs. Spending")
+
+# spend_banks # no relationship
+
+
+grid.arrange(arrangeGrob(spend_edu, spend_fam_size, ncol = 1), spend_wealth, nrow = 1)
+
 ```
+
+We then examined relationships between demographic characteristics and 1998 spending. Some selected plots are shown above. Our initial analysis indicates that family size is positively associated with spending, which is intuitive given the cost of raising children. Additionally, families with household heads who have higher educational status tend to spend more than those headed by less educated individuals. This may be a function of income or wealth, as higher educated individuals tend to earn more; regardless, it is worth exploring further. Finally, both income and wealth are positively associated with spending, and households with debit cards tend to spend more at all levels of income and wealth. 
 
 ```{r}
 ###pct of income, no different than above
