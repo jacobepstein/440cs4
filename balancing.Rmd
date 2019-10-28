@@ -10,6 +10,8 @@ library(ggplot2)
 library(Matching)
 library(xtable)
 library(dplyr)
+library(cobalt)
+library(MatchIt)
 
 ```
 
@@ -206,8 +208,21 @@ mu5=predict(model_treated,newdata=olp.debit[ATE_matching_m$index.control,],type=
 mu6=predict(model_treated,newdata=olp.debit[ATE_matching_m$index.treated,],type="response")
 
 ATE_mix=ATE_matching_m$est-(-sum(mu3)+sum(mu4)-sum(mu5)+sum(mu6))/(6*dim(olp.debit)[1])
+```
+
+```{r}
+#Cobalt
+
+#weight
+debit.weighted = bal.tab(olp.debit[,-c(1,2,16)], treat = olp.debit$debit_card1998, method = "weighting", weights = ipw, estimand = "ATT")
+love.plot(debit.weighted)
 
 
+#Nearest Neighbor 2:1 Matching
+match.out = matchit(f.build("debit_card1998", olp.debit), data = olp.debit, method = "nearest", 
+                 ratio = 1,  replace = TRUE)
+debit.matched = bal.tab(match.out)
 
+love.plot(debit.matched)
 ```
 
