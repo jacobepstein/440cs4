@@ -7,11 +7,11 @@ output: html_document
 
 ```{r}
 library(ggplot2)
-#library(mgcv)
+library(mgcv)
 library(Matching)
 library(xtable)
 
-rhc.data<-read.table("rhc.txt")
+rhc.data<-read.table("data/rhc.txt")
 
 #Check Missing Values
 any(unlist(lapply(rhc.data,FUN=function(x){any(is.na(x))})))
@@ -70,8 +70,8 @@ outcomeformula = function()
           liverhx + gibledhx + malighx + immunhx + transhx + amihx + wt0 + ortho)
 }
 
-model_control<-glm(outcomeformula, data=data_c,family=binomial(link="logit"))
-model_treated<-glm(outcomeformula, data=data_t,family=binomial(link="logit"))
+model_control<-glm(outcomeformula(), data=data_c,family=binomial(link="logit"))
+model_treated<-glm(outcomeformula(), data=data_t,family=binomial(link="logit"))
 
 
 #model_control<-glm(
@@ -98,29 +98,29 @@ ATE_1<-(sum(data_t$dth30-predict(model_control,newdata = data_t,type="response")
 
 ATT_1<-mean(data_t$dth30-predict(model_control,newdata = data_t,type="response"))
 
-######################################
-#Calculate variance via Delta Method #
-######################################
-
-X=predict(model_control,newdata=data_t,type='lpmatrix')
-c=coef(model_control)
-w=exp(-X%*%c)/((1+exp(-X%*%c))^2)
-h=apply(X,2,FUN=function(x){sum(x*w)})
-VAR_T<-t(h)%*%vcov(model_control,freq=T)%*%h
-
-X=predict(model_treated,newdata=data_c,type='lpmatrix')
-t=coef(model_treated)
-w=exp(-X%*%t)/((1+exp(-X%*%t))^2)
-h=apply(X,2,FUN=function(x){sum(x*w)})
-VAR_C<-t(h)%*%vcov(model_treated,freq=T)%*%h
-ATE_VAR_reg=VAR_T/dim(rhc.data)[1]^2+VAR_C/dim(rhc.data)[1]^2+
-  var(rhc.data$dth30)/dim(rhc.data)[1]
+# ######################################
+# #Calculate variance via Delta Method #
+# ######################################
+# 
+# X=predict(model_control,newdata=data_t,type='lpmatrix')
+# c=coef(model_control)
+# w=exp(-X%*%c)/((1+exp(-X%*%c))^2)
+# h=apply(X,2,FUN=function(x){sum(x*w)})
+# VAR_T<-t(h)%*%vcov(model_control,freq=T)%*%h
+# 
+# X=predict(model_treated,newdata=data_c,type='lpmatrix')
+# t=coef(model_treated)
+# w=exp(-X%*%t)/((1+exp(-X%*%t))^2)
+# h=apply(X,2,FUN=function(x){sum(x*w)})
+# VAR_C<-t(h)%*%vcov(model_treated,freq=T)%*%h
+# ATE_VAR_reg=VAR_T/dim(rhc.data)[1]^2+VAR_C/dim(rhc.data)[1]^2+
+#   var(rhc.data$dth30)/dim(rhc.data)[1]
 #Standard Deviation of ATE
-sqrt(ATE_VAR_reg)
+#sqrt(ATE_VAR_reg)
 
 #Standard Deviation of ATT
-ATT_VAR_reg= var(data_t$dth30)/dim(data_t)[1]+VAR_T/dim(data_t)[1]^2
-sqrt(ATT_VAR_reg)
+#ATT_VAR_reg= var(data_t$dth30)/dim(data_t)[1]+VAR_T/dim(data_t)[1]^2
+#sqrt(ATT_VAR_reg)
 
 
 ###########################
@@ -143,11 +143,13 @@ propscoreformula = function()
 }
 
 
-first_model<-glm(as.formula(paste(colnames(rhc.data)[1], "~",
-                                   paste(colnames(rhc.data)[c_indi], collapse = "+"),"+",
-                                   paste(paste("s(",colnames(rhc.data)[n_indi],")",sep=""),collapse="+"),
-                                   sep = ""
-)),family = binomial(link="logit"),data=rhc.data
+first_model<-glm(treatment ~ age + sex + race + edu + income + 
+          ninsclas + cat1 + cat2 + resp + card + neuro + gastr + renal + meta +
+          hema + seps + trauma + das2d3pc + dnr1 + ca + surv2md1 +
+          aps1 + scoma1 + wtkilo1 + temp1 + meanbp1 + resp1 + hrt1 + pafi1 + 
+          paco21 + ph1 + wblc1 + hema1 + sod1 + pot1 + crea1 + bili1 + alb1 + 
+          cardiohx + chfhx + dementhx + psychhx + chrpulhx + renalhx + 
+          liverhx + gibledhx + malighx + immunhx + transhx + amihx + wt0 + ortho,family = binomial(link="logit"),data=rhc.data
 )
 
 rhc.data.pro<-rhc.data
