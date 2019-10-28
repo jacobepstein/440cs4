@@ -15,6 +15,12 @@ library(haven)
 library(dplyr)
 library(ggplot2)
 library(gridExtra)
+library(tidyverse)
+#library(mgcv)
+library(Matching)
+library(xtable)
+library(xgboost)
+library(mgcv)
 ```
 
 
@@ -120,8 +126,6 @@ spend98_wealth = ggplot(debit %>% filter(wealth > 0), aes(x = spend98_pct_wealth
   theme_minimal()
 
 grid.arrange(spend95_wealth, spend98_wealth, nrow = 2)
-
-
 ```
 
 ```{r, fig.width=15, fig.height=7}
@@ -227,7 +231,6 @@ spend_banks = ggplot(debit %>% filter(num_of_banks < 500), aes(y = spending1998,
 
 
 grid.arrange(arrangeGrob(spend_edu, spend_fam_size, ncol = 1), spend_wealth, nrow = 1)
-
 ```
 
 We then examined relationships between demographic characteristics and 1998 spending. Some selected plots are shown above. Our initial analysis indicates that family size is positively associated with spending, which is intuitive given the cost of raising children. Additionally, families with household heads who have higher educational status tend to spend more than those headed by less educated individuals. This may be a function of income or wealth, as higher educated individuals tend to earn more; regardless, it is worth exploring further. Finally, both income and wealth are positively associated with spending, and households with debit cards tend to spend more at all levels of income and wealth. 
@@ -264,8 +267,254 @@ We then examined relationships between demographic characteristics and 1998 spen
 ## Data Balancing
 
 
+```{r}
+debit = read_dta("data/debitcard199598.dta")
+
+#Clean
+any(unlist(lapply(debit,FUN=function(x){any(is.na(x))})))
+
+debit = debit %>%
+  mutate(num_of_earners = as.factor(num_of_earners)) %>%
+  mutate(family_size = as.factor(family_size)) %>%
+  mutate(average_age = factor(average_age, labels = c("<30", "31-40", "41-50", "51-65", "65+")))  %>%
+  mutate(geograph_area = factor(geograph_area, labels = c("North", "Central Italy", "South and Islands"))) %>%
+  mutate(num_of_inhabitants = factor(num_of_inhabitants, labels = c("<20k", "20-40k", "40-500k", "500k+"))) %>%
+  mutate(householder_age = factor(householder_age, labels = c("<30", "31-40", "41-50", "51-65", "65+"))) %>%
+  mutate(householder_education = factor(householder_education, labels = c("None", "Elementary", "Middle School", "High School", "Bachelors", "Post-Graduate"))) %>%
+  mutate(debit_card1998 = as.factor(debit_card1998))
+
+
+#Continuous Variables
+names(which(unlist(lapply(debit,class))=="numeric"))
+
+#Categorical Variables
+names(which(unlist(lapply(debit,class))=="factor"))
+
+n_indi<-c(which(unlist(lapply(debit,class))=="numeric"))
+c_indi<-c(which(unlist(lapply(debit,class))=="factor"))
+
+#Descriptive Comparison
+data_t<-subset(debit,debit_card1998==1)
+data_c<-subset(debit,debit_card1998==0)
+size_t<-dim(data_t)[1]
+size_c<-dim(data_c)[1]
+
+debit$debit_card1998 = as.integer(debit$debit_card1998)
+debit$debit_card1998 = debit$debit_card1998 - 1
+```
+
+```{r}
+#Calculate ASD for Continuous Variables
+dif1<-apply(data.matrix(data_t[,n_indi]),2,mean)-
+  apply(data.matrix(data_c[,n_indi]),2,mean)
+
+sd1<-sqrt(apply(data.matrix(data_t[,n_indi]),2,var)/size_t+
+      apply(data.matrix(data_c[,n_indi]),2,var)/size_c)
+
+ASD_1<-dif1/sd1;boxplot(ASD_1)
+
+ASD<-data.frame(mean=dif1,sd=sd1,asd=ASD_1)
+
+pdf("asd.pdf",width=8,height=6)
+ggplot(data=ASD,aes(x=names(ASD_1),y=asd,ymin=asd,ymax=asd))+geom_pointrange()+
+  geom_hline(yintercept = 0,lty=2)+coord_flip()+xlab("Variables")+ylab("Standardized Difference")
+dev.off()
+
+model_control<-lm(spending1998 ~ spending1995 + num_of_earners + average_age + family_size + geograph_area + num_of_inhabitants + householder_age + householder_education + num_of_banks + interest_rate + income + wealth + cash_inventory, data=data_c)
+                  
+model_treated<-lm(spending1998 ~ spending1995 + num_of_earners + average_age + family_size + geograph_area + num_of_inhabitants + householder_age + householder_education + num_of_banks + interest_rate + income + wealth + cash_inventory, data=data_t)
+
+
+ATE_1<-(sum(data_t$spending1998-predict(model_control,newdata = data_t,type="response"))-
+  sum(data_c$spending1998-predict(model_treated,newdata = data_c,type="response")))/dim(debit)[1]
+
+
+ATT_1<-mean(data_t$spending1998-predict(model_control,newdata = data_t,type="response"))
+
+```
+
+```{r}
+#PS Histogram
+outcomeformula = function()
+{
+  return(debit_card1998 ~ spending1995 + num_of_earners + average_age + family_size + geograph_area +  num_of_inhabitants + householder_age + householder_education + num_of_banks + interest_rate + income + wealth + cash_inventory)
+}
+
+first_model = glm(outcomeformula(), family = binomial(link="logit"), data = debit)
+
+debit.ps = debit
+debit.ps$ps = fitted(first_model)
+
+a<-hist(debit.ps$ps[which(debit.ps$debit_card1998==0)],breaks=50,freq=FALSE)
+a$counts<-a$counts/sum(a$counts)
+
+b<-hist(debit.ps$ps[which(debit.ps$debit_card1998==1)],breaks=50,add=T)
+b$counts<-b$counts/sum(b$counts)
+
+pdf("prophist.pdf",width=8,height=6)
+plot(a,col=rgb(1,0,0,0.5),main="Overlap Check",cex.main=0.9,xlab="Estimated Propensity Score",ylab="Density",xlim=c(0,1))
+plot(b,add=TRUE,col=rgb(0,0,1,0.5),main="Overlap Check",xlab="Estimated Propensity Score",ylab="Density")
+legend("topright",legend=c("Control Group","Treatment Group"),col=c("red","blue"),pch=15,cex=0.7)
+#dev.off()
+
+################################################
+#  Exclude samples in nonoverlapping region   ##
+################################################ 
+low_bound<-max(min(debit.ps$ps[which(debit.ps$debit_card1998==1)]),
+               min(debit.ps$ps[which(debit.ps$debit_card1998==0)]))
+
+up_bound<-min(max(debit.ps$ps[which(debit.ps$debit_card1998==1)]),
+              max(debit.ps$ps[which(debit.ps$debit_card1998==0)]))
+
+#Disgard the sample out of the common support
+olp.debit<-subset(debit.ps,debit.ps$ps>=low_bound&debit.ps$ps<=up_bound)
+```
+
+
+```{r}
+#PS Matching
+olp.debit$debit_card1998 = as.integer(olp.debit$debit_card1998)
+olp.debit$debit_card1998 = olp.debit$debit_card1998 - 1
+olp.debit$debit_card1998 = as.logical(olp.debit$debit_card1998)
+
+ATE_matching_m<-Match(Y=olp.debit$spending1998,Tr=olp.debit$debit_card1998,estimand = "ATE",
+                  X=data.matrix(olp.debit[,-c(1,2,16)]),M=6,Weight = 1)
+
+ATT_matching_m<-Match(Y=olp.debit$spending1998,Tr=olp.debit$debit_card1998,estimand = "ATT",
+                      X=data.matrix(olp.debit[,-c(1,2,16)]),M=6,Weight = 1)
+
+#Balance Check: defends on the method#
+######################################
+treated<-unique(ATT_matching_m$index.treated)
+control<-ATT_matching_m$index.control ## Is there a reason to not take unique here
+treat_size<-length(treated)
+control_size<-dim(olp.debit)[1]-treat_size
+
+
+debit$debit_card1998 = as.integer(debit$debit_card1998)
+
+#ASD: absolute standardized difference. original data
+ori_d<-apply(data.matrix(debit[,-c(1,2)]),MARGIN=2,FUN=function(x){
+  abs(mean(x[debit$debit_card1998==1])-mean(x[debit$debit_card1998==0]))})
+
+
+sd<-apply(data.matrix(debit[,-c(1,2)]),MARGIN=2,FUN=function(x)
+{sqrt(var(x[debit$debit_card1998==1])/sum(debit$debit_card1998)+var(x[debit$debit_card1998==0])/sum(1-debit$debit_card1998))})
+
+ori_asd<-ori_d/sd
+
+ori_asd
+
+olp_sd<-apply(data.matrix(olp.debit[,-c(1,2,16)]),MARGIN=2,FUN=function(x)
+{sqrt(var(x[treated])/treat_size+var(x[-treated])/control_size)})
+
+#ASD: matching  
+
+match_d<-apply(data.matrix(olp.debit[,-c(1,2,16)]),MARGIN=2,FUN=function(x)
+{abs(mean(x[treated])-mean(x[control]))})
+match_asd<-match_d/olp_sd
+
+
+#ASD: weighting
+ipw<-olp.debit$ps/(1-olp.debit$ps)
+ipw_d<-apply(data.matrix(olp.debit[,-c(1,2,16)]),MARGIN=2,FUN=function(x){
+  abs(mean(x[treated])-sum(x[-treated]*ipw[-treated])/
+        sum(ipw[-treated]))})
+weight_asd<-ipw_d/olp_sd
+
+ipw_d
+
+###########################################
+#ASD Comparison between methods: boxplot  #
+###########################################
+pdf("ASD_compare.pdf",width=8,height=6)
+boxplot(ori_asd,weight_asd,match_asd,main="ASD for Different Methods",names=c("original","weighting","matching"),
+        ylab="Abs Standardized Difference")
+dev.off()
+```
+
+
+
 ## Model Selection
 
+```{r}
+controls = olp.debit[control,]
+control_X = controls %>% dplyr::select(-spending1998, -debit_card1998, -ps)
+control_Y = controls$debit_card1998
+
+treats = olp.debit[treated,]
+treat_X = treats %>% dplyr::select(-spending1998, -debit_card1998)
+treat_Y = treats$debit_card1998
+
+model_control_m<-glm(outcomeformula(), controls, family=binomial(link="logit"))
+model_treated_m<-glm(outcomeformula(), treats, family=binomial(link="logit"))
+
+##Regression Adjustment with XGBoost
+model_control_boost <- xgboost(data=data.matrix(control_X), label = data.matrix(control_Y), nrounds = 30)
+model_treat_boost <- xgboost(data=data.matrix(treat_X), label = data.matrix(treat_Y), nrounds = 30)
+
+#ATT
+mu1=predict(model_control_boost,newdata=data.matrix(control_X),type="response")
+mu2=predict(model_control_boost,newdata=data.matrix(treat_X),type="response")
+ATT_mix=mean(olp.rhc.data[treated,"dth30"])-sum(olp.rhc.data[control,"dth30"]+mu2-mu1)/(6*treat_size)
+
+#ATE
+mu3=predict(model_control_boost,newdata=data.matrix(control_X),type="response")
+mu4=predict(model_control_boost,newdata=data.matrix(treat_X),type="response")
+mu5=predict(model_treat_boost,newdata=data.matrix(control_X),type="response")
+mu6=predict(model_treat_boost,newdata=data.matrix(treat_X),type="response")
+
+ATE_mix=ATE_matching_m$est-(-sum(mu3)+sum(mu4)-sum(mu5)+sum(mu6))/(6*dim(olp.debit)[1])
+ATE_mix
+
+##Regression Adjustment with Splines (the "gam" function in the "mgcv" package)   
+controls=controls %>% mutate_if(is.character, as.factor)
+treats=treats %>% mutate_if(is.character, as.factor)
+
+outcomeformula_gam = function()
+{
+  return(debit_card1998 ~ s(spending1995) + s(num_of_earners) + average_age + s(family_size) + geograph_area + num_of_inhabitants + householder_age + s(householder_education) + s(num_of_banks) + s(interest_rate) + s(income) + s(wealth) + s(cash_inventory))
+}
+
+model_control_gam <- mgcv::gam(formula = outcomeformula_gam(), data = controls)
+model_control_gam <- mgcv::gam(formula = outcomeformula_gam(), data = treats)
+
+mu3=predict(model_control_gam,newdata=data.matrix(control_X),type="response")
+mu4=predict(model_control_gam,newdata=data.matrix(treat_X),type="response")
+mu3=predict(model_treat_gam,newdata=data.matrix(control_X),type="response")
+mu4=predict(model_treat_gam,newdata=data.matrix(treat_X),type="response")
+
+ATE_mix2=ATE_matching_m$est-(-sum(mu3)+sum(mu4)-sum(mu5)+sum(mu6))/(6*dim(olp.debit)[1])
+ATE_mix
+```
+
+```{r}
+# ######################################
+# #Calculate variance via Delta Method #
+# ######################################
+#
+X=predict(model_control_boost,
+          newdata=data.matrix(data_t %>% dplyr::select(-spending1998, -debit_card1998)),
+          type='lpmatrix')
+c=coef(model_control_boost)
+w=exp(-X%*%c)/((1+exp(-X%*%c))^2)
+h=apply(X,2,FUN=function(x){sum(x*w)})
+VAR_T<-t(h)%*%vcov(model_control_boost,freq=T)%*%h
+
+X=predict(model_treat_boost,newdata=data_c,type='lpmatrix')
+t=coef(model_treat_boost)
+w=exp(-X%*%t)/((1+exp(-X%*%t))^2)
+h=apply(X,2,FUN=function(x){sum(x*w)})
+VAR_C<-t(h)%*%vcov(model_treat_boost,freq=T)%*%h
+ATE_VAR_reg=VAR_T/dim(rhc.data)[1]^2+VAR_C/dim(debit)[1]^2+
+  var(debit$debit_card1998)/dim(debit)[1]
+#Standard Deviation of ATE
+sqrt(ATE_VAR_reg)
+
+#Standard Deviation of ATT
+ATT_VAR_reg= var(debit$debit_card1998)/dim(data_t)[1]+VAR_T/dim(data_t)[1]^2
+sqrt(ATT_VAR_reg)
+```
 
 ## Conclusions
 
