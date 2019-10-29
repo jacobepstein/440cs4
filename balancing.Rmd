@@ -10,6 +10,8 @@ library(ggplot2)
 library(Matching)
 library(xtable)
 library(dplyr)
+library(cobalt)
+library(MatchIt)
 
 ```
 
@@ -149,8 +151,6 @@ sd<-apply(data.matrix(debit[,-c(1,2)]),MARGIN=2,FUN=function(x)
 
 ori_asd<-ori_d/sd
 
-ori_asd
-
 olp_sd<-apply(data.matrix(olp.debit[,-c(1,2,16)]),MARGIN=2,FUN=function(x)
 {sqrt(var(x[treated])/treat_size+var(x[-treated])/control_size)})
 
@@ -168,7 +168,7 @@ ipw_d<-apply(data.matrix(olp.debit[,-c(1,2,16)]),MARGIN=2,FUN=function(x){
         sum(ipw[-treated]))})
 weight_asd<-ipw_d/olp_sd
 
-ipw_d
+
 
 ###########################################
 #ASD Comparison between methods: boxplot  #
@@ -178,5 +178,51 @@ boxplot(ori_asd,weight_asd,match_asd,main="ASD for Different Methods",names=c("o
         ylab="Abs Standardized Difference")
 dev.off()
 
+```
+
+
+```{r}
+############################################
+#Regression Adjustment 2: on Matched Sample#
+############################################
+
+##############################################################
+### need to re-fit the regression model to the matched sample#
+##############################################################
+
+#model_control_m<-glm(outcomeformula, data=data_c,family=binomial(link="logit"))
+#model_treated_m<-glm(outcomeformula, data=data_t,family=binomial(link="logit"))
+
+
+#ATT
+mu1=predict(model_control,newdata=olp.debit[control,],type="response")
+mu2=predict(model_control,newdata=olp.debit[ATT_matching_m$index.treated,],type="response")
+
+ATT_mix=mean(olp.debit[treated,]$spending1998)-sum(olp.debit[control,]$spending1998+mu2-mu1)/(6*treat_size)
+
+
+#ATE
+mu3=predict(model_control,newdata=olp.debit[ATE_matching_m$index.control,],type="response")
+mu4=predict(model_control,newdata=olp.debit[ATE_matching_m$index.treated,],type="response")
+mu5=predict(model_treated,newdata=olp.debit[ATE_matching_m$index.control,],type="response")
+mu6=predict(model_treated,newdata=olp.debit[ATE_matching_m$index.treated,],type="response")
+
+ATE_mix=ATE_matching_m$est-(-sum(mu3)+sum(mu4)-sum(mu5)+sum(mu6))/(6*dim(olp.debit)[1])
+```
+
+```{r}
+#Cobalt
+
+#weight
+debit.weighted = bal.tab(olp.debit[,-c(1,2,16)], treat = olp.debit$debit_card1998, method = "weighting", weights = ipw, estimand = "ATT")
+love.plot(debit.weighted)
+
+
+#Nearest Neighbor 2:1 Matching
+match.out = matchit(f.build("debit_card1998", olp.debit), data = olp.debit, method = "nearest", 
+                 ratio = 1,  replace = TRUE)
+debit.matched = bal.tab(match.out)
+
+love.plot(debit.matched)
 ```
 
