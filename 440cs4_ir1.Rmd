@@ -515,10 +515,10 @@ mu5=predict(model_treat_boost,newdata=data.matrix(control_X),type="response")
 mu6=predict(model_treat_boost,newdata=data.matrix(treat_X),type="response")
 ATE_mix_boost=ATE_match_rep$est-(-sum(mu3)+sum(mu4)-sum(mu5)+sum(mu6))/(6*dim(olp.debit)[1])
 
-data.frame(ATT_mix_lin,
-      ATE_mix_lin,
-      ATT_mix_boost, 
-      ATE_mix_boost)
+# data.frame(ATT_mix_lin,
+#       ATE_mix_lin,
+#       ATT_mix_boost, 
+#       ATE_mix_boost)
 
 
 
@@ -540,6 +540,8 @@ treats=treats %>% mutate_if(is.character, as.factor)
 # ATE_mix2=ATE_match_rep$est-(-sum(mu3)+sum(mu4)-sum(mu5)+sum(mu6))/(6*dim(olp.debit)[1])
 # ATE_mix
 ```
+![](outputtable.png)
+
 
 ```{r}
 # ######################################
@@ -569,5 +571,6 @@ treats=treats %>% mutate_if(is.character, as.factor)
 
 ## Conclusions
 
+From our model, we can conclude that having a debit card caused the households with debit cards to increase their spending by about $460 per month. 
 
 
