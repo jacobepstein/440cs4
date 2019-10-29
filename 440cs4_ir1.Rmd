@@ -404,13 +404,7 @@ ATT_ipw<-(olp.debit%>%filter(debit_card1998==TRUE)%>%summarise(mean=mean(spendin
 ATE_ipw<-sum(olp.debit%>%filter(debit_card1998==TRUE)%>%pull(spending1998)/olp.debit%>%filter(debit_card1998==TRUE)%>%pull(ps))/sum(1/(olp.debit%>%filter(debit_card1998==TRUE)%>%pull(ps)))-sum(olp.debit%>%filter(debit_card1998==FALSE)%>%pull(spending1998)/(1-olp.debit%>%filter(debit_card1998==FALSE)%>%pull(ps)))/sum(1/(1-olp.debit%>%filter(debit_card1998==FALSE)%>%pull(ps)))
 
 #balance check for 1:1 matching without replacement
-treat = unique(ATT_match_norep$index.treated)
-control = unique(ATT_match_norep$index.control)
-treat_size = length(treated)
-control_size = length(control)
-
 debit$debit_card1998 = as.integer(debit$debit_card1998)
-
 ori_data<-apply(data.matrix(debit[,-c(1,2)]),MARGIN=2,FUN=function(x){
   abs(mean(x[debit$debit_card1998==1])-mean(x[debit$debit_card1998==0]))})
 rep_sd<-apply(data.matrix(debit[,-c(1,2)]),MARGIN=2,FUN=function(x)
@@ -418,18 +412,33 @@ rep_sd<-apply(data.matrix(debit[,-c(1,2)]),MARGIN=2,FUN=function(x)
 
 ori_asd<-ori_data/rep_sd
 
-olp_sd<-apply(data.matrix(olp.debit[,-c(1,2,16)]),MARGIN=2,FUN=function(x){sqrt(var(x[treat]))/treat_size+var(x[treat])/control_size}) #x[treat] not working becasuse x is list... the output of x[treat] == x%>%filter(debit_card1998==TRUE) but the tidyverse version doesnt work...
+treat_norep = unique(ATT_match_norep$index.treated)
+control_norep = unique(ATT_match_norep$index.control)
+treat_norep_size = length(treat_norep)
+control_norep_size = length(control_norep)
 
-#matching #norep and rep?
-match_d<-apply(data.matrix(olp.debit[,-c(1,2,16)]),MARGIN=2,FUN=function(x){abs(mean(x[treat])-mean(x[control]))}) #^
-match_asd<-match_d/olp_sd
+olp_norep_sd<-apply(data.matrix(olp.debit[,-c(1,2,16)]),MARGIN=2,FUN=function(x){sqrt(var(x[treat_norep]))/treat_norep_size+var(x[treat_norep])/control_norep_size})
 
-#weighting
-ipw_data<-apply(data.matrix(olp.debit[,-c(1,2,16)]),MARGIN=2,FUN=function(x){abs(mean(x[treat])-sum(x[-treat]*ipw[-treat])/sum(ipw[-treat]))}) #^
-weight_asd<-ipw_data/olp_sd
+match11_d<-apply(data.matrix(olp.debit[,-c(1,2,16)]),MARGIN=2,FUN=function(x){abs(mean(x[treat_norep])-mean(x[control_norep]))})
+match11_asd<-match11_d/olp_norep_sd
+
+#balance check for 1:5 matching with replacement
+treat_rep = unique(ATT_match_rep$index.treated)
+control_rep = unique(ATT_match_rep$index.control)
+treat_rep_size = length(treat_rep)
+control_rep_size = length(control_rep)
+
+olp_rep_sd<-apply(data.matrix(olp.debit[,-c(1,2,16)]),MARGIN=2,FUN=function(x){sqrt(var(x[treat_rep]))/treat_rep_size+var(x[treat_rep])/control_rep_size})
+
+match15_d<-apply(data.matrix(olp.debit[,-c(1,2,16)]),MARGIN=2,FUN=function(x){abs(mean(x[treat_rep])-mean(x[control_rep]))})
+match15_asd<-match15_d/olp_rep_sd
+
+#balance check for weighting
+ipw_data<-apply(data.matrix(olp.debit[,-c(1,2,16)]),MARGIN=2,FUN=function(x){abs(mean(x[treat_norep])-sum(x[-treat_norep]*olp.debit$ipw[-treat_norep])/sum(olp.debit$ipw[-treat_norep]))})
+weight_asd<-ipw_data/olp_norep_sd
 
 #asd comparison boxplot
-boxplot(ori_asd, match_asd, weight_asd, main="ASD for Different Methods",names=c("original","matching","weighting"),ylab="Abs Standardized Difference")
+boxplot(ori_asd, match11_asd, match15_asd, weight_asd, main="ASD for Different Methods",names=c("original","1:1 matching","1:5 matching","weighting"),ylab="Abs Standardized Difference")
 ```
 
 ```{r sahil-loveplot}
