@@ -398,14 +398,16 @@ ATT_match_rep<-Match(Y=olp.debit$spending1998,Tr=olp.debit$debit_card1998,estima
 
 #weighting
 olp.debit=olp.debit%>%mutate(ipw=ps/(1-ps))
+
 ATT_ipw<-(olp.debit%>%filter(debit_card1998==TRUE)%>%summarise(mean=mean(spending1998)))-sum((olp.debit%>%filter(debit_card1998==FALSE))*(olp.debit%>%filter(debit_card1998==FALSE)%>%pull(ipw)))/sum((olp.debit%>%filter(debit_card1998==FALSE)%>%pull(ipw)))
+
 ATE_ipw<-sum(olp.debit%>%filter(debit_card1998==TRUE)%>%pull(spending1998)/olp.debit%>%filter(debit_card1998==TRUE)%>%pull(ps))/sum(1/(olp.debit%>%filter(debit_card1998==TRUE)%>%pull(ps)))-sum(olp.debit%>%filter(debit_card1998==FALSE)%>%pull(spending1998)/(1-olp.debit%>%filter(debit_card1998==FALSE)%>%pull(ps)))/sum(1/(1-olp.debit%>%filter(debit_card1998==FALSE)%>%pull(ps)))
 
-#balance check
-treat=olp.debit%>%filter(debit_card1998==TRUE)
-treat_size=olp.debit%>%filter(debit_card1998==TRUE)%>%nrow()
-control=olp.debit%>%filter(debit_card1998==FALSE) #or is it ATT_match_rep$index.treated?
-control_size=olp.debit%>%filter(debit_card1998==FALSE)%>%nrow()
+#balance check for 1:1 matching without replacement
+treat = unique(ATT_match_norep$index.treated)
+control = unique(ATT_match_norep$index.control)
+treat_size = length(treated)
+control_size = length(control)
 
 debit$debit_card1998 = as.integer(debit$debit_card1998)
 
@@ -427,7 +429,7 @@ ipw_data<-apply(data.matrix(olp.debit[,-c(1,2,16)]),MARGIN=2,FUN=function(x){abs
 weight_asd<-ipw_data/olp_sd
 
 #asd comparison boxplot
-boxplot(ori_asd,match_asd,weight_asdmain="ASD for Different Methods",names=c("original","matching","weighting"),ylab="Abs Standardized Difference")
+boxplot(ori_asd, match_asd, weight_asd, main="ASD for Different Methods",names=c("original","matching","weighting"),ylab="Abs Standardized Difference")
 ```
 
 ```{r sahil-loveplot}
