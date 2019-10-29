@@ -438,7 +438,10 @@ weight_asd<-ipw_data/olp_norep_sd
 ori_asd<-ori_data/rep_sd
 
 #asd comparison boxplot
+
+pdf("ASD_compare.pdf",width=8,height=6)
 boxplot(ori_asd, match11_asd, match15_asd, weight_asd, main="ASD for Different Methods",names=c("original","1:1 matching","1:5 matching","weighting"),ylab="Abs Standardized Difference")
+dev.off()
 ```
 
 ```{r}
@@ -480,7 +483,10 @@ model_treated <- lm(outcome_formula(), data = treats)
 #ATT
 mu1 = predict(model_control, newdata=controls, type = "response")
 mu2 = predict(model_control, newdata=treats, type = "response")
+
+
 ATT_mix_lin = mean(unlist(olp.debit[ATT_match_rep$index.treated, "spending1998"]), na.rm=TRUE) - sum(olp.debit[ATT_match_rep$index.control, "spending1998"] + mu2 - mu1, na.rm = TRUE)/(6*treat_rep_size)
+
 
 #ATE
 mu3 = predict(model_control, newdata=controls,type="response")
@@ -497,7 +503,9 @@ model_treat_boost <- xgboost(data=data.matrix(treat_X), label = data.matrix(trea
 #ATT
 mu1=predict(model_control_boost,newdata=data.matrix(control_X),type="response")
 mu2=predict(model_control_boost,newdata=data.matrix(treat_X),type="response")
+
 ATT_mix_boost=mean(olp.debit %>% filter(debit_card1998 == 1) %>% dplyr::select(spending1998) %>% unlist())-sum(olp.debit[ATT_match_rep$index.control,"spending1998"]+mu2-mu1)/(6*treat_rep_size)
+
 
 #ATE
 mu3=predict(model_control_boost,newdata=data.matrix(control_X),type="response")
