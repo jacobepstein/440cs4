@@ -378,7 +378,7 @@ olp.debit<-subset(debit.ps,debit.ps$ps>=low_bound&debit.ps$ps<=up_bound)
 ```
 
 
-```{r sahil-matching}
+```{r}
 #clean olp.debit
 olp.debit$debit_card1998=as.integer(olp.debit$debit_card1998)
 olp.debit$debit_card1998=olp.debit$debit_card1998-1
@@ -441,7 +441,7 @@ weight_asd<-ipw_data/olp_norep_sd
 boxplot(ori_asd, match11_asd, match15_asd, weight_asd, main="ASD for Different Methods",names=c("original","1:1 matching","1:5 matching","weighting"),ylab="Abs Standardized Difference")
 ```
 
-```{r sahil-loveplot}
+```{r}
 #Cobalt
 
 #match without replacement?
@@ -458,7 +458,7 @@ debit.matched=bal.tab(match.out)
 love.plot(debit.matched)
 ```
 
-## Model Selection SAHIL
+## Model Selection
 ```{r}
 outcome_formula = function()
 {
