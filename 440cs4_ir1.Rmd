@@ -388,15 +388,15 @@ ori_asd<-ori_data/rep_sd
 
 #1:1 matching without replacement
 ATE_match_norep<-Match(Y=olp.debit$spending1998,Tr=olp.debit$debit_card1998,estimand="ATE",
-                      X=data.matrix(olp.debit[,-c(1,2,16)]),M=1,Weight=1) #Tr not 1995?
+                      X=data.matrix(olp.debit[,-c(1,2,16,17)]),M=1,Weight=1) #Tr not 1995?
 ATT_match_norep<-Match(Y=olp.debit$spending1998,Tr=olp.debit$debit_card1998,estimand="ATT",
-                     X=data.matrix(olp.debit[,-c(1,2,16)]),M=1,Weight=1) #^
+                     X=data.matrix(olp.debit[,-c(1,2,16,17)]),M=1,Weight=1) #^
 
 #1:5 matching with replacement
 ATE_match_rep<-Match(Y=olp.debit$spending1998,Tr=olp.debit$debit_card1998,estimand="ATE",
-                      X=data.matrix(olp.debit[,-c(1,2,16)]),M=5,Weight=1) #^
+                      X=data.matrix(olp.debit[,-c(1,2,16,17)]),M=5,Weight=1) #^
 ATT_match_rep<-Match(Y=olp.debit$spending1998,Tr=olp.debit$debit_card1998,estimand="ATT",
-                     X=data.matrix(olp.debit[,-c(1,2,16)]),M=5,Weight=1) #^
+                     X=data.matrix(olp.debit[,-c(1,2,16,17)]),M=5,Weight=1) #^
 
 #weighting
 olp.debit=olp.debit%>%mutate(ipw=ps/(1-ps))
