@@ -3,8 +3,8 @@ title: "Case Study IV, Interim Report I"
 author: "Jake Epstein, Daniel Spottiswood, Man-Lin Hsiao, Michael Tan, Sahil Patel"
 date: "10/29/2019"
 output:
-  html_document: default
   pdf_document: default
+  html_document: default
 ---
 ```{r, echo = FALSE, message = FALSE}
 knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE)
@@ -371,13 +371,17 @@ olp.debit<-subset(debit.ps,debit.ps$ps>=low_bound&debit.ps$ps<=up_bound)
 
 
 ```{r}
-#clean olp.debit
-olp.debit$debit_card1998=as.integer(olp.debit$debit_card1998)
-olp.debit$debit_card1998=olp.debit$debit_card1998-1
-olp.debit$debit_card1998=as.logical(olp.debit$debit_card1998)
+# #clean olp.debit
+# olp.debit$debit_card1998=as.integer(olp.debit$debit_card1998)
+# olp.debit$debit_card1998=olp.debit$debit_card1998-1
+# olp.debit$debit_card1998=as.logical(olp.debit$debit_card1998)
 
 #weighting
 olp.debit=olp.debit%>%mutate(ipw=ps/(1-ps))
+
+ATT_ipw<-(olp.debit%>%filter(debit_card1998==TRUE)%>%summarise(mean=mean(spending1998)))-sum((olp.debit%>%filter(debit_card1998==FALSE))*(olp.debit%>%filter(debit_card1998==FALSE)%>%pull(ipw)))/sum((olp.debit%>%filter(debit_card1998==FALSE)%>%pull(ipw)))
+
+ATE_ipw<-sum(olp.debit%>%filter(debit_card1998==TRUE)%>%pull(spending1998)/olp.debit%>%filter(debit_card1998==TRUE)%>%pull(ps))/sum(1/(olp.debit%>%filter(debit_card1998==TRUE)%>%pull(ps)))-sum(olp.debit%>%filter(debit_card1998==FALSE)%>%pull(spending1998)/(1-olp.debit%>%filter(debit_card1998==FALSE)%>%pull(ps)))/sum(1/(1-olp.debit%>%filter(debit_card1998==FALSE)%>%pull(ps)))
 
 
 #1:1 matching without replacement
@@ -394,9 +398,6 @@ ATT_match_rep<-Match(Y=olp.debit$spending1998,Tr=olp.debit$debit_card1998,estima
 
 
 
-ATT_ipw<-(olp.debit%>%filter(debit_card1998==TRUE)%>%summarise(mean=mean(spending1998)))-sum((olp.debit%>%filter(debit_card1998==FALSE))*(olp.debit%>%filter(debit_card1998==FALSE)%>%pull(ipw)))/sum((olp.debit%>%filter(debit_card1998==FALSE)%>%pull(ipw)))
-
-ATE_ipw<-sum(olp.debit%>%filter(debit_card1998==TRUE)%>%pull(spending1998)/olp.debit%>%filter(debit_card1998==TRUE)%>%pull(ps))/sum(1/(olp.debit%>%filter(debit_card1998==TRUE)%>%pull(ps)))-sum(olp.debit%>%filter(debit_card1998==FALSE)%>%pull(spending1998)/(1-olp.debit%>%filter(debit_card1998==FALSE)%>%pull(ps)))/sum(1/(1-olp.debit%>%filter(debit_card1998==FALSE)%>%pull(ps)))
 
 #balance check for 1:1 matching without replacement
 debit$debit_card1998 = as.integer(debit$debit_card1998)
@@ -479,33 +480,37 @@ model_treated <- lm(outcome_formula(), data = treats)
 #ATT
 mu1 = predict(model_control, newdata=controls, type = "response")
 mu2 = predict(model_control, newdata=treats, type = "response")
-ATT_mix = mean(olp.debit[ATT_match_rep$index.treated, "spending1998"]) - sum(olp.debit[ATT_match_rep$index.control, "spending1998"] + mu2 - mu1)/(6*treat_rep_size)
+ATT_mix_lin = mean(unlist(olp.debit[ATT_match_rep$index.treated, "spending1998"]), na.rm=TRUE) - sum(olp.debit[ATT_match_rep$index.control, "spending1998"] + mu2 - mu1, na.rm = TRUE)/(6*treat_rep_size)
 
 #ATE
 mu3 = predict(model_control, newdata=controls,type="response")
 mu4 = predict(model_control, newdata=treats,type="response")
 mu5 =predict(model_treated, newdata=controls,type="response")
 mu6 = predict(model_treated, newdata=treats,type="response")
-ATE_mix = ATE_match_rep$est - (-sum(mu3) + sum(mu4) - sum(mu5) + sum(mu6))/(6*dim(olp.debit)[1])
+ATE_mix_lin = ATE_match_rep$est - (-sum(mu3) + sum(mu4) - sum(mu5) + sum(mu6))/(6*dim(olp.debit)[1])
 
 
 #Regression Adjustment with XGBoost
-model_control_boost <- xgboost(data=data.matrix(control_X), label = data.matrix(control_Y), nrounds = 30)
-model_treat_boost <- xgboost(data=data.matrix(treat_X), label = data.matrix(treat_Y), nrounds = 30)
+model_control_boost <- xgboost(data=data.matrix(control_X), label = data.matrix(control_Y), nrounds = 30, verbose = 0)
+model_treat_boost <- xgboost(data=data.matrix(treat_X), label = data.matrix(treat_Y), nrounds = 30, verbose = 0)
 
 #ATT
 mu1=predict(model_control_boost,newdata=data.matrix(control_X),type="response")
 mu2=predict(model_control_boost,newdata=data.matrix(treat_X),type="response")
-ATT_mix=mean(olp.debit %>% filter(debit_card1998))-sum(olp.debit[ATT_match_rep$index.control,"spending1998"]+mu2-mu1)/(6*treat_rep_size)
-ATT_mix
+ATT_mix_boost=mean(olp.debit %>% filter(debit_card1998 == 1) %>% dplyr::select(spending1998) %>% unlist())-sum(olp.debit[ATT_match_rep$index.control,"spending1998"]+mu2-mu1)/(6*treat_rep_size)
 
 #ATE
 mu3=predict(model_control_boost,newdata=data.matrix(control_X),type="response")
 mu4=predict(model_control_boost,newdata=data.matrix(treat_X),type="response")
 mu5=predict(model_treat_boost,newdata=data.matrix(control_X),type="response")
 mu6=predict(model_treat_boost,newdata=data.matrix(treat_X),type="response")
-ATE_mix=ATE_match_rep$est-(-sum(mu3)+sum(mu4)-sum(mu5)+sum(mu6))/(6*dim(olp.debit)[1])
-ATE_mix
+ATE_mix_boost=ATE_match_rep$est-(-sum(mu3)+sum(mu4)-sum(mu5)+sum(mu6))/(6*dim(olp.debit)[1])
+
+data.frame(ATT_mix_lin,
+      ATE_mix_lin,
+      ATT_mix_boost, 
+      ATE_mix_boost)
+
 
 
 #Regression Adjustment with Splines (the "gam" function in the "mgcv" package)   
