@@ -418,7 +418,7 @@ rep_sd<-apply(data.matrix(debit[,-c(1,2)]),MARGIN=2,FUN=function(x)
 
 ori_asd<-ori_data/rep_sd
 
-olp_sd<-apply(data.matrix(olp.debit[,-c(1,2,16)]),MARGIN=2,FUN=function(x){sqrt(var(x[treat]))/treat_size+var(x[treat])/control_size}) #x[treat] not working
+olp_sd<-apply(data.matrix(olp.debit[,-c(1,2,16)]),MARGIN=2,FUN=function(x){sqrt(var(x[treat]))/treat_size+var(x[treat])/control_size}) #x[treat] not working becasuse x is list... the output of x[treat] == x%>%filter(debit_card1998==TRUE) but the tidyverse version doesnt work...
 
 #matching #norep and rep?
 match_d<-apply(data.matrix(olp.debit[,-c(1,2,16)]),MARGIN=2,FUN=function(x){abs(mean(x[treat])-mean(x[control]))}) #^
