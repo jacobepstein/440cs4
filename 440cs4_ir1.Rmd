@@ -401,8 +401,6 @@ olp.debit=olp.debit%>%mutate(ipw=ps/(1-ps))
 ATT_ipw<-(olp.debit%>%filter(debit_card1998==TRUE)%>%summarise(mean=mean(spending1998)))-sum((olp.debit%>%filter(debit_card1998==FALSE))*(olp.debit%>%filter(debit_card1998==FALSE)%>%pull(ipw)))/sum((olp.debit%>%filter(debit_card1998==FALSE)%>%pull(ipw)))
 ATE_ipw<-sum(olp.debit%>%filter(debit_card1998==TRUE)%>%pull(spending1998)/olp.debit%>%filter(debit_card1998==TRUE)%>%pull(ps))/sum(1/(olp.debit%>%filter(debit_card1998==TRUE)%>%pull(ps)))-sum(olp.debit%>%filter(debit_card1998==FALSE)%>%pull(spending1998)/(1-olp.debit%>%filter(debit_card1998==FALSE)%>%pull(ps)))/sum(1/(1-olp.debit%>%filter(debit_card1998==FALSE)%>%pull(ps)))
 
-#Double Robustness?
-
 #balance check
 treat=olp.debit%>%filter(debit_card1998==TRUE)
 treat_size=olp.debit%>%filter(debit_card1998==TRUE)%>%nrow()
@@ -440,7 +438,7 @@ boxplot(ori_asd,match_asd,weight_asdmain="ASD for Different Methods",names=c("or
 #matching with replacement?
 
 #weight
-debit.weighted = bal.tab(olp.debit[,-c(1,2,16)],treat=olp.debit$debit_card1998,method="weighting", weights=ipw,estimand="ATT")
+debit.weighted=bal.tab(olp.debit[,-c(1,2,16)],treat=olp.debit$debit_card1998,method="weighting", weights=ipw,estimand="ATT")
 love.plot(debit.weighted)
 
 #Nearest Neighbor 2:1 Matching
