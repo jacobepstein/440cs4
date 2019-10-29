@@ -125,8 +125,6 @@ spend98_wealth = ggplot(debit %>% filter(wealth > 0), aes(x = spend98_pct_wealth
   theme_minimal()
 
 grid.arrange(spend95_wealth, spend98_wealth, nrow = 2)
-
-
 ```
 
 ```{r, fig.width=15, fig.height=7}
@@ -368,6 +366,7 @@ up_bound<-min(max(debit.ps$ps[which(debit.ps$debit_card1998==1)]),
 #Disgard the sample out of the common support
 olp.debit<-subset(debit.ps,debit.ps$ps>=low_bound&debit.ps$ps<=up_bound)
 ```
+We calculate propensity scores using general logistic regression. We then exclude the samples in the nonoverlapping region. One can see from the histogram that there is significant overlap between the propensity scores of the control and treatment groups.
 
 
 ```{r}
@@ -443,13 +442,10 @@ pdf("ASD_compare.pdf",width=8,height=6)
 boxplot(ori_asd, match11_asd, match15_asd, weight_asd, main="ASD for Different Methods",names=c("original","1:1 matching","1:5 matching","weighting"),ylab="Abs Standardized Difference")
 dev.off()
 ```
+Using propensity scores we went ahead with matching and weighting to help acheive balance in the covariates across control and treatment groups. We performed matching with and without replacement, although our prior is that with replacement will be superior as we can create larger more balanced samples. Comparing the absolute standardized differences for the original data and the balanced data given our three different methods we see that weighting acheives the most balanced data. While it seems that both forms of matching should record improvements in balance over the original data, it is not unlikely that due to variation they may perform worse.
 
 ```{r}
 #Cobalt
-
-#match without replacement?
-
-#matching with replacement?
 
 #weight
 debit.weighted=bal.tab(olp.debit[,-c(1,2,16)],treat=olp.debit$debit_card1998,method="weighting", weights=olp.debit$ipw,estimand="ATT")
@@ -460,6 +456,7 @@ match.out=matchit(f.build("debit_card1998",olp.debit),data=olp.debit,method="nea
 debit.matched=bal.tab(match.out)
 love.plot(debit.matched)
 ```
+Moving forward with weighting, we see that the absolute mean differences are improved significantly across almost all covariates.
 
 ## Model Selection
 ```{r}
