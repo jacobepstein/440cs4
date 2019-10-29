@@ -364,7 +364,8 @@ up_bound<-min(max(debit.ps$ps[which(debit.ps$debit_card1998==1)]),
 #Disgard the sample out of the common support
 olp.debit<-subset(debit.ps,debit.ps$ps>=low_bound&debit.ps$ps<=up_bound)
 ```
-We calculate propensity scores using general logistic regression. We then exclude the samples in the nonoverlapping region. One can see from the histogram that there is significant overlap between the propensity scores of the control and treatment groups.
+![](overlap_check.png)
+We calculate propensity scores using general logistic regression. We then exclude the samples in the nonoverlapping region. One can see from the histogram that there is significant overlap between the propensity scores of the control and treatment groups; however, we expect this can be improved upon.
 
 
 ```{r}
@@ -442,7 +443,7 @@ pdf("ASD_compare.pdf",width=8,height=6)
 boxplot(ori_asd, match11_asd, match15_asd, weight_asd, main="ASD for Different Methods",names=c("original","1:1 matching","1:5 matching","weighting"),ylab="Abs Standardized Difference")
 dev.off()
 ```
-![](ASD_compare.pdf)
+![](asd_compare.png)
 
 Using propensity scores we went ahead with matching and weighting to help acheive balance in the covariates across control and treatment groups. We performed matching with and without replacement, although our prior is that with replacement will be superior as we can create larger more balanced samples. Comparing the absolute standardized differences for the original data and the balanced data given our three different methods we see that weighting acheives the most balanced data. While it seems that both forms of matching should record improvements in balance over the original data, it is not unlikely that due to variation they may perform worse.
 
@@ -462,7 +463,7 @@ Moving forward with weighting, we see that the absolute mean differences are imp
 
 ## Model Selection
 
-We considered two models to find the treatment effect of debit card on spending: a simple linear model as well as a more flexible XGBoost Model. Both models yield very similar results, and their outputs are shown below. Since the linear model is simpler, we will report our conclusions using the results from this model.
+We considered two models to find the treatment effect of debit card on spending: a simple linear model as well as a more flexible XGBoost Model. Both models yield very similar results, and their outputs are shown below. Since the linear model is more interpretable, we will report our conclusions using the results from this model. However, further exploration should be done to determine whether a more flexibe model, such as Xgboost might in general yield more accurate results.
 
 
 ```{r}
@@ -516,11 +517,11 @@ mu4=predict(model_control_boost,newdata=data.matrix(treat_X),type="response")
 mu5=predict(model_treat_boost,newdata=data.matrix(control_X),type="response")
 mu6=predict(model_treat_boost,newdata=data.matrix(treat_X),type="response")
 ATE_mix_boost=ATE_match_rep$est-(-sum(mu3)+sum(mu4)-sum(mu5)+sum(mu6))/(6*dim(olp.debit)[1])
-
-data.frame(ATT_mix_lin,
-      ATE_mix_lin,
-      ATT_mix_boost, 
-      ATE_mix_boost)
+# 
+# data.frame(ATT_mix_lin,
+#       ATE_mix_lin,
+#       ATT_mix_boost, 
+#       ATE_mix_boost)
 
 
 
@@ -542,7 +543,6 @@ treats=treats %>% mutate_if(is.character, as.factor)
 # ATE_mix2=ATE_match_rep$est-(-sum(mu3)+sum(mu4)-sum(mu5)+sum(mu6))/(6*dim(olp.debit)[1])
 # ATE_mix
 ```
-
 ```{r}
 # ######################################
 # #Calculate variance via Delta Method #
@@ -570,6 +570,7 @@ treats=treats %>% mutate_if(is.character, as.factor)
 ```
 
 ## Conclusions
+![](outputtable.png)
 
-
+From our model, we can conclude that having a debit card caused the Italian households with debit cards to increase their spending by about $460 per month. 
 
