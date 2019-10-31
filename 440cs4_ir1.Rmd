@@ -436,6 +436,9 @@ weight_asd<-ipw_data/olp_norep_sd
 ori_asd<-ori_data/rep_sd
 
 #asd comparison boxplot
+
+
+
 ```
 
 ```{r, include = FALSE}
