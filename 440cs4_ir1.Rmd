@@ -20,6 +20,8 @@ library(MatchIt)
 library(Matching)
 library(xtable)
 library(xgboost)
+library(randomForest)
+library(twang)
 ```
 
 
@@ -333,20 +335,27 @@ ATT_1<-mean(data_t$spending1998-predict(model_control,newdata = data_t,type="res
 ```
 
 ```{r, include = FALSE}
-#PS Histogram
+#PS methods
 
-first_model = glm(debit_card1998 ~ spending1995 + num_of_earners + average_age + family_size + geograph_area +  num_of_inhabitants + householder_age + householder_education + num_of_banks + interest_rate + income + wealth + cash_inventory, family = binomial(link="logit"), data = debit)
+basicLog = glm(debit_card1998 ~ spending1995 + num_of_earners + average_age + family_size + geograph_area +  num_of_inhabitants + householder_age + householder_education + num_of_banks + interest_rate + income + wealth + cash_inventory, family = binomial(link="logit"), data = debit)
+
+randomForest = randomForest(as.factor(debit_card1998) ~ spending1995 + num_of_earners + average_age + family_size + geograph_area +  num_of_inhabitants + householder_age + householder_education + num_of_banks + interest_rate + income + wealth + cash_inventory, data = debit)
+
+CART = ps(debit_card1998 ~ spending1995 + num_of_earners + average_age + family_size + geograph_area +  num_of_inhabitants + householder_age + householder_education + num_of_banks + interest_rate + income + wealth + cash_inventory, data = as.data.frame(debit))
 
 debit.ps = debit
-debit.ps$ps = fitted(first_model)
+debit.ps$ps_basicLog = fitted(basicLog)
+debit.ps$ps_randomForest = randomForest$votes[, 2]
+debit.ps$ps_CART = CART$ps[, 1]
 
-a<-hist(debit.ps$ps[which(debit.ps$debit_card1998==0)],breaks=50,freq=FALSE)
+#basicLog
+a<-hist(debit.ps$ps_basicLog[which(debit.ps$debit_card1998==0)],breaks=50,freq=FALSE)
 a$counts<-a$counts/sum(a$counts)
 
-b<-hist(debit.ps$ps[which(debit.ps$debit_card1998==1)],breaks=50,add=TRUE)
+b<-hist(debit.ps$ps_basicLog[which(debit.ps$debit_card1998==1)],breaks=50,add=TRUE)
 b$counts<-b$counts/sum(b$counts)
 
-pdf("prophist.pdf",width=8,height=6)
+pdf("prophist_basicLog.pdf",width=8,height=6)
 plot(a,col=rgb(1,0,0,0.5),main="Overlap Check",cex.main=0.9,xlab="Estimated Propensity Score",ylab="Density",xlim=c(0,1))
 plot(b,add=TRUE,col=rgb(0,0,1,0.5),main="Overlap Check",xlab="Estimated Propensity Score",ylab="Density")
 legend("topright",legend=c("Control Group","Treatment Group"),col=c("red","blue"),pch=15,cex=0.7)
@@ -355,14 +364,151 @@ dev.off()
 ################################################
 #  Exclude samples in nonoverlapping region   ##
 ################################################ 
-low_bound<-max(min(debit.ps$ps[which(debit.ps$debit_card1998==1)]),
-               min(debit.ps$ps[which(debit.ps$debit_card1998==0)]))
+low_bound<-max(min(debit.ps$ps_basicLog[which(debit.ps$debit_card1998==1)]),
+               min(debit.ps$ps_basicLog[which(debit.ps$debit_card1998==0)]))
 
-up_bound<-min(max(debit.ps$ps[which(debit.ps$debit_card1998==1)]),
-              max(debit.ps$ps[which(debit.ps$debit_card1998==0)]))
+up_bound<-min(max(debit.ps$ps_basicLog[which(debit.ps$debit_card1998==1)]),
+              max(debit.ps$ps_basicLog[which(debit.ps$debit_card1998==0)]))
 
 #Disgard the sample out of the common support
-olp.debit<-subset(debit.ps,debit.ps$ps>=low_bound&debit.ps$ps<=up_bound)
+olp.debit<-subset(debit.ps,debit.ps$ps_basicLog>=low_bound&debit.ps$ps_basicLog<=up_bound)
+
+olp.debit= olp.debit %>% 
+  mutate(ipw_bl = ps_basicLog/(1-ps_basicLog)) %>%
+  mutate(ipw_rf = ps_randomForest/(1-ps_randomForest)) %>%
+  mutate(ipw_CART = ps_CART/(1-ps_CART))
+
+#weighting basic Log
+
+ATT_ipw_bl<-(olp.debit%>%filter(debit_card1998==TRUE)%>%summarise(mean=mean(spending1998)))-sum((olp.debit%>%filter(debit_card1998==FALSE))*(olp.debit%>%filter(debit_card1998==FALSE)%>%pull(ipw_bl)))/sum((olp.debit%>%filter(debit_card1998==FALSE)%>%pull(ipw_bl)))
+
+ATE_ipw_bl<-sum(olp.debit%>%filter(debit_card1998==TRUE)%>%pull(spending1998)/olp.debit%>%filter(debit_card1998==TRUE)%>%pull(ps_basicLog))/sum(1/(olp.debit%>%filter(debit_card1998==TRUE)%>%pull(ps_basicLog)))-sum(olp.debit%>%filter(debit_card1998==FALSE)%>%pull(spending1998)/(1-olp.debit%>%filter(debit_card1998==FALSE)%>%pull(ps_basicLog)))/sum(1/(1-olp.debit%>%filter(debit_card1998==FALSE)%>%pull(ps_basicLog)))
+
+#weighting random Forest
+#  Exclude samples in nonoverlapping region   
+low_bound<-max(min(debit.ps$ps_randomForest[which(debit.ps$debit_card1998==1)]),
+               min(debit.ps$ps_randomForest[which(debit.ps$debit_card1998==0)]))
+
+up_bound<-min(max(debit.ps$ps_randomForest[which(debit.ps$debit_card1998==1)]),
+              max(debit.ps$ps_randomForest[which(debit.ps$debit_card1998==0)]))
+
+#Disgard the sample out of the common support
+olp.debit<-subset(debit.ps,debit.ps$ps_randomForest>=low_bound&debit.ps$ps_randomForest<=up_bound)
+
+olp.debit= olp.debit %>% 
+  mutate(ipw_bl = ps_basicLog/(1-ps_basicLog)) %>%
+  mutate(ipw_rf = ps_randomForest/(1-ps_randomForest)) %>%
+  mutate(ipw_CART = ps_CART/(1-ps_CART))
+
+
+
+
+ATT_ipw_rf<-(olp.debit%>%filter(debit_card1998==TRUE)%>%summarise(mean=mean(spending1998)))-sum((olp.debit%>%filter(debit_card1998==FALSE))*(olp.debit%>%filter(debit_card1998==FALSE)%>%pull(ipw_rf)))/sum((olp.debit%>%filter(debit_card1998==FALSE)%>%pull(ipw_rf)))
+
+ATE_ipw_rf<-sum(olp.debit%>%filter(debit_card1998==TRUE)%>%pull(spending1998)/olp.debit%>%filter(debit_card1998==TRUE)%>%pull(ps_basicLog))/sum(1/(olp.debit%>%filter(debit_card1998==TRUE)%>%pull(ps_randomForest)))-sum(olp.debit%>%filter(debit_card1998==FALSE)%>%pull(spending1998)/(1-olp.debit%>%filter(debit_card1998==FALSE)%>%pull(ps_randomForest)))/sum(1/(1-olp.debit%>%filter(debit_card1998==FALSE)%>%pull(ps_randomForest)))
+
+
+#weighting CART
+#  Exclude samples in nonoverlapping region   
+low_bound<-max(min(debit.ps$ps_CART[which(debit.ps$debit_card1998==1)]),
+               min(debit.ps$ps_CART[which(debit.ps$debit_card1998==0)]))
+
+up_bound<-min(max(debit.ps$ps_CART[which(debit.ps$debit_card1998==1)]),
+              max(debit.ps$ps_CART[which(debit.ps$debit_card1998==0)]))
+
+#Disgard the sample out of the common support
+olp.debit<-subset(debit.ps,debit.ps$ps_CART>=low_bound&debit.ps$ps_CART<=up_bound)
+
+olp.debit= olp.debit %>% 
+  mutate(ipw_bl = ps_basicLog/(1-ps_basicLog)) %>%
+  mutate(ipw_rf = ps_randomForest/(1-ps_randomForest)) %>%
+  mutate(ipw_CART = ps_CART/(1-ps_CART))
+
+ATT_ipw_CART<-(olp.debit%>%filter(debit_card1998==TRUE)%>%summarise(mean=mean(spending1998)))-sum((olp.debit%>%filter(debit_card1998==FALSE))*(olp.debit%>%filter(debit_card1998==FALSE)%>%pull(ipw_CART)))/sum((olp.debit%>%filter(debit_card1998==FALSE)%>%pull(ipw_CART)))
+
+ATE_ipw_CART<-sum(olp.debit%>%filter(debit_card1998==TRUE)%>%pull(spending1998)/olp.debit%>%filter(debit_card1998==TRUE)%>%pull(ps_basicLog))/sum(1/(olp.debit%>%filter(debit_card1998==TRUE)%>%pull(ps_CART)))-sum(olp.debit%>%filter(debit_card1998==FALSE)%>%pull(spending1998)/(1-olp.debit%>%filter(debit_card1998==FALSE)%>%pull(ps_CART)))/sum(1/(1-olp.debit%>%filter(debit_card1998==FALSE)%>%pull(ps_CART)))
+
+#Cobalt
+debit.basicLog_weight=bal.tab(olp.debit[,-c(1,2,16:21)],treat=olp.debit$debit_card1998,method="weighting", weights=olp.debit$ipw_bl,estimand="ATT")
+
+debit.randomForest_weight=bal.tab(olp.debit[,-c(1,2,16:21)],treat=olp.debit$debit_card1998,method="weighting", weights=olp.debit$ipw_rf,estimand="ATT")
+
+debit.CART_weight=bal.tab(olp.debit[,-c(1,2,16:21)],treat=olp.debit$debit_card1998,method="weighting", weights=olp.debit$ipw_CART,estimand="ATT")
+
+#loveplots
+love.plot(debit.basicLog_weight,
+          drop.distance = TRUE, 
+          var.order = "unadjusted",
+          line = TRUE, 
+          threshold = .1,
+          stars = "raw")
+
+love.plot(debit.randomForest_weight,
+          drop.distance = TRUE, 
+          var.order = "unadjusted",
+          line = TRUE, 
+          threshold = .1,
+          stars = "raw")
+
+love.plot(debit.CART_weight,
+          drop.distance = TRUE, 
+          var.order = "unadjusted",
+          line = TRUE, 
+          threshold = .1,
+          stars = "raw")
+
+
+#original
+ori_d<-apply(data.matrix(debit[,-c(1,2)]),MARGIN=2,FUN=function(x){
+  abs(mean(x[debit$debit_card1998==1])-mean(x[debit$debit_card1998==0]))})
+
+sd<-apply(data.matrix(debit[,-c(1,2)]),MARGIN=2,FUN=function(x)
+{sqrt(var(x[debit$debit_card1998==1])/sum(debit$debit_card1998)+var(x[debit$debit_card1998==0])/sum(1-debit$debit_card1998))})
+
+ori_asd<-ori_d/sd
+
+boxplot(ori_asd, debit.basicLog_weight$Balance$Diff.Adj, debit.randomForest_weight$Balance$Diff.Adj, debit.CART_weight$Balance$Diff.Adj, main="ASD for Different Methods",names=c("Original", "Logistic Weighting","Random Forest","CART Weighting"),ylab="Abs Standardized Difference")
+
+boxplot(debit.basicLog_weight$Balance$Diff.Adj, debit.randomForest_weight$Balance$Diff.Adj, debit.CART_weight$Balance$Diff.Adj, main="ASD for Different Weighting Methods",names=c("Basic Logistic","Random Forest","CART"),ylab="Abs Standardized Difference")
+```
+
+
+
+```{r}
+
+#1:1 matching without replacement
+ATE_match_norep<-Match(Y=olp.debit$spending1998,Tr=olp.debit$debit_card1998,estimand="ATE",
+                      X=data.matrix(olp.debit[,-c(1,2,16:21)]),M=1,Weight=1) #Tr not 1995?
+ATT_match_norep<-Match(Y=olp.debit$spending1998,Tr=olp.debit$debit_card1998,estimand="ATT",
+                     X=data.matrix(olp.debit[,-c(1,2,16:21)]),M=1,Weight=1) #^
+
+treat_norep = unique(ATT_match_norep$index.treated)
+control_norep = unique(ATT_match_norep$index.control)
+treat_norep_size = length(treat_norep)
+control_norep_size = length(control_norep)
+
+olp_norep_sd<-apply(data.matrix(olp.debit[,-c(1,2,16:21)]),MARGIN=2,FUN=function(x){sqrt(var(x[treat_norep]))/treat_norep_size+var(x[treat_norep])/control_norep_size})
+
+ipw_bl_data<-apply(data.matrix(olp.debit[,-c(1,2,16:21)]),MARGIN=2,FUN=function(x){abs(mean(x[treat_norep])-sum(x[-treat_norep]*olp.debit$ipw_bl[-treat_norep])/sum(olp.debit$ipw_bl[-treat_norep]))})
+
+weight_bl_asd<-ipw_bl_data/olp_norep_sd
+
+ipw_rf_data<-apply(data.matrix(olp.debit[,-c(1,2,16:21)]),MARGIN=2,FUN=function(x){abs(mean(x[treat_norep])-sum(x[-treat_norep]*olp.debit$ipw_rf[-treat_norep])/sum(olp.debit$ipw_rf[-treat_norep]))})
+
+weight_rf_asd<-ipw_rf_data/olp_norep_sd
+
+ipw_CART_data<-apply(data.matrix(olp.debit[,-c(1,2,16:21)]),MARGIN=2,FUN=function(x){abs(mean(x[treat_norep])-sum(x[-treat_norep]*olp.debit$ipw_CART[-treat_norep])/sum(olp.debit$ipw_CART[-treat_norep]))})
+
+weight_CART_asd<-ipw_CART_data/olp_norep_sd
+
+
+
+
+
+boxplot(ori_asd, weight_bl_asd, weight_rf_asd, weight_CART_asd, main="ASD for Different Methods",names=c("original","Basic Logistic Weighting","Random Forest Weighting","CART weighting"),ylab="Abs Standardized Difference")
+
+
+          
 ```
 ![](overlap_check.png)
 We calculate propensity scores using general logistic regression. We then exclude the samples in the nonoverlapping region. One can see from the histogram that there is significant overlap between the propensity scores of the control and treatment groups; however, we expect this can be improved upon.
@@ -436,6 +582,8 @@ weight_asd<-ipw_data/olp_norep_sd
 ori_asd<-ori_data/rep_sd
 
 #asd comparison boxplot
+#3 weightings, 3 matchings
+#talk about tradeoffs
 
 
 
@@ -454,7 +602,7 @@ Using propensity scores we went ahead with matching and weighting to help acheiv
 #Cobalt
 
 #weight
-debit.weighted=bal.tab(olp.debit[,-c(1,2,16, 17)],treat=olp.debit$debit_card1998,method="weighting", weights=olp.debit$ipw,estimand="ATT")
+debit.weighted=bal.tab(olp.debit[,-c(1,2,16:21)],treat=olp.debit$debit_card1998,method="weighting", weights=olp.debit$ipw_bl,estimand="ATT")
 love.plot(debit.weighted)
 
 #Nearest Neighbor 2:1 Matching
