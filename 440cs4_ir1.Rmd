@@ -404,7 +404,6 @@ olp.debit= olp.debit %>%
 
 debit.randomForest_weight=bal.tab(olp.debit[,-c(1,2,16:21)],treat=olp.debit$debit_card1998,method="weighting", weights=olp.debit$ipw_rf,estimand="ATT")
 
-
 ATT_ipw_rf<-(olp.debit%>%filter(debit_card1998==TRUE)%>%summarise(mean=mean(spending1998)))-sum((olp.debit%>%filter(debit_card1998==FALSE))*(olp.debit%>%filter(debit_card1998==FALSE)%>%pull(ipw_rf)))/sum((olp.debit%>%filter(debit_card1998==FALSE)%>%pull(ipw_rf)))
 
 ATE_ipw_rf<-sum(olp.debit%>%filter(debit_card1998==TRUE)%>%pull(spending1998)/olp.debit%>%filter(debit_card1998==TRUE)%>%pull(ps_basicLog))/sum(1/(olp.debit%>%filter(debit_card1998==TRUE)%>%pull(ps_randomForest)))-sum(olp.debit%>%filter(debit_card1998==FALSE)%>%pull(spending1998)/(1-olp.debit%>%filter(debit_card1998==FALSE)%>%pull(ps_randomForest)))/sum(1/(1-olp.debit%>%filter(debit_card1998==FALSE)%>%pull(ps_randomForest)))
