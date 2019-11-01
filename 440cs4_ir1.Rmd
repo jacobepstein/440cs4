@@ -458,29 +458,23 @@ love.plot(debit.CART_weight,
 boxplot(ori_asd, weight_bl_asd, weight_rf_asd, weight_CART_asd, main="ASD for Different Methods",names=c("original","Basic Logistic Weighting","Random Forest Weighting","CART weighting"),ylab="Abs Standardized Difference")
 
 
-ATE_matching_m<-Match(Y=olp.debit$spending1998,Tr=olp.debit$debit_card1998,estimand = "ATE",
-                  X=data.matrix(olp.debit[,-c(1,2,16:21)]),M=6,Weight = 1)
-
-ATT_matching_m<-Match(Y=olp.debit$spending1998,Tr=olp.debit$debit_card1998,estimand = "ATT",
-                      X=data.matrix(olp.debit[,-c(1,2,16:21)]),M=6,Weight = 1)
-
-treated<-unique(ATT_matching_m$index.treated)
-control<-ATT_matching_m$index.control
+treated<- which(olp.debit$debit_card1998 == 1)
+control<-which(olp.debit$debit_card1998 == 0)
 treat_size<-length(treated)
 control_size<-dim(olp.debit)[1]-treat_size
 
 olp_sd<-apply(data.matrix(olp.debit[,-c(1,2,16:21)]),MARGIN=2,FUN=function(x)
-{sqrt(var(x[treated])/treat_size+var(x[-treated])/control_size)})
+{sqrt(var(x[treated])/treat_size+var(x[control])/control_size)})
 
-ipw_bl_data<-apply(data.matrix(olp.debit[,-c(1,2,16:21)]),MARGIN=2,FUN=function(x){abs(mean(x[treated])-sum(x[-treated]*olp.debit$ipw_bl[-treated])/sum(olp.debit$ipw_bl[-treated]))})
+ipw_bl_data<-apply(data.matrix(olp.debit[,-c(1,2,16:21)]),MARGIN=2,FUN=function(x){abs(mean(x[treated])-sum(x[control]*olp.debit$ps_basicLog[control])/sum(olp.debit$ps_basicLog[control]))})
 
 weight_bl_asd<-ipw_bl_data/olp_sd
 
-ipw_rf_data<-apply(data.matrix(olp.debit[,-c(1,2,16:21)]),MARGIN=2,FUN=function(x){abs(mean(x[treated])-sum(x[-treated]*olp.debit$ipw_rf[-treated])/sum(olp.debit$ipw_rf[-treated]))})
+ipw_rf_data<-apply(data.matrix(olp.debit[,-c(1,2,16:21)]),MARGIN=2,FUN=function(x){abs(mean(x[treated])-sum(x[control]*olp.debit$ps_randomForest[control])/sum(olp.debit$ps_randomForest[control]))})
 
 weight_rf_asd<-ipw_rf_data/olp_sd
 
-ipw_CART_data<-apply(data.matrix(olp.debit[,-c(1,2,16:21)]),MARGIN=2,FUN=function(x){abs(mean(x[treated])-sum(x[-treated]*olp.debit$ipw_CART[-treated])/sum(olp.debit$ipw_CART[-treated]))})
+ipw_CART_data<-apply(data.matrix(olp.debit[,-c(1,2,16:21)]),MARGIN=2,FUN=function(x){abs(mean(x[treated])-sum(x[control]*olp.debit$ps_CART[control])/sum(olp.debit$ps_CART[control]))})
 
 weight_CART_asd<-ipw_CART_data/olp_sd
 
@@ -494,12 +488,6 @@ sd<-apply(data.matrix(debit[,-c(1,2)]),MARGIN=2,FUN=function(x)
 
 ori_asd<-ori_d/sd
 
-
-
-##MATCHING
-match_d<-apply(data.matrix(olp.debit[,-c(1,2,16:21)]),MARGIN=2,FUN=function(x)
-{abs(mean(x[treated])-mean(x[control]))})
-match_asd<-match_d/olp_sd
 
 
 #More matching
@@ -518,7 +506,11 @@ control_size1<-dim(olp.debit)[1]-treat_size
 
 match_d_1<-apply(data.matrix(olp.debit[,-c(1,2,16:21)]),MARGIN=2,FUN=function(x)
 {abs(mean(x[treated1])-mean(x[control1]))})
-match_asd_1<-match_d_1/olp_sd
+
+olp_sd1<-apply(data.matrix(olp.debit[,-c(1,2,16:21)]),MARGIN=2,FUN=function(x)
+{sqrt(var(x[treated1])/treat_size+var(x[control1])/control_size1)})
+
+match_asd_1<-match_d_1/olp_sd1
 
 #1:3
 
@@ -533,12 +525,15 @@ control3<-ATT_matching_3$index.control
 treat_size3<-length(treated)
 control_size3<-dim(olp.debit)[1]-treat_size
 
+olp_sd3<-apply(data.matrix(olp.debit[,-c(1,2,16:21)]),MARGIN=2,FUN=function(x)
+{sqrt(var(x[treated3])/treat_size+var(x[control3])/control_size3)})
+
 match_d_3<-apply(data.matrix(olp.debit[,-c(1,2,16:21)]),MARGIN=2,FUN=function(x)
 {abs(mean(x[treated3])-mean(x[control3]))})
-match_asd_3<-match_d_3/olp_sd
+match_asd_3<-match_d_3/olp_sd3
 
 pdf("asd_compare.pdf",width=8,height=6)
-boxplot(ori_asd, match_asd, match_asd_1, match_asd_3, weight_bl_asd, weight_rf_asd, weight_CART_asd, main="ASD for Different Methods",names=c("original", "1:6M", "1:1M", "1:3M", "Logistic Wt","RF Wt","CART Wt"),ylab="Abs Standardized Difference")
+boxplot(ori_asd, match_asd_1, match_asd_3, weight_bl_asd, weight_rf_asd, weight_CART_asd, main="ASD for Different Methods",names=c("original", "1:1M", "1:3M", "Logistic Wt","RF Wt","CART Wt"),ylab="Abs Standardized Difference")
 dev.off()
           
 ```
