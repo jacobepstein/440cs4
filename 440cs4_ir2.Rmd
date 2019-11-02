@@ -545,7 +545,8 @@ Moving forward with weighting, we see that the absolute mean differences are imp
 
 We considered two models to find the treatment effect of debit card on spending: a simple linear model as well as a more flexible XGBoost Model. Both models yield very similar results, and their outputs are shown below. Since the linear model is more interpretable, we will report our conclusions using the results from this model. However, further exploration should be done to determine whether a more flexibe model, such as Xgboost might in general yield more accurate results.
 
-```{r}
+```{r, eval = FALSE}
+#delete eval=FALSE^
 outcome_formula = function()
 {
   return(spending1998 ~ spending1995 + num_of_earners + average_age + family_size + geograph_area + num_of_inhabitants + householder_age + householder_education + num_of_banks + interest_rate + income + wealth + cash_inventory)
