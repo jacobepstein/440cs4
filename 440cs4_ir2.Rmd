@@ -527,18 +527,8 @@ dev.off()
 ![](overlap_check.png)
 We calculate propensity scores using general logistic regression. We then exclude the samples in the nonoverlapping region. One can see from the histogram that there is significant overlap between the propensity scores of the control and treatment groups; however, we expect this can be improved upon.
 
-```{r, warning=FALSE, message=FALSE}
-#Cobalt
+![](ASD_compare.png)
 
-#weight
-debit.weighted=bal.tab(olp.debit[,-c(1,2,16:21)],treat=olp.debit$debit_card1998,method="weighting", weights=olp.debit$ipw_bl,estimand="ATT")
-love.plot(debit.weighted)
-
-#Nearest Neighbor 2:1 Matching
-# match.out=matchit(f.build("debit_card1998",olp.debit[,-c(1,2,16)]),data=olp.debit,method="nearest",ratio=1,replace=TRUE)
-# debit.matched=bal.tab(match.out)
-# love.plot(debit.matched)
-```
 Moving forward with weighting, we see that the absolute mean differences are improved significantly across almost all covariates.
 
 ## Model Selection
