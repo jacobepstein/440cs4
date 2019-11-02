@@ -25,7 +25,6 @@ library(randomForest)
 library(twang)
 ```
 
-
 ```{r}
 #load, clean data
 debit = read_dta("data/debitcard199598.dta")
@@ -39,16 +38,13 @@ debit = debit %>%
   mutate(spending1995 = as.numeric(spending1995), spending1998 = as.numeric(spending1998), debit_card1998 = as.logical(debit_card1998))
 ```
 
-
 ## Introduction
 
 The goal of this case study is to evaluate the causal impact of debit card ownership on household spending. The data come from the Italy Survey on Household Income and Wealth (SHIW), a 1995-1998 survey of 584 Italian households. The dataset includes 1995 and 1998 monthly household spending, whether the household had exactly one debit card in 1998 and demographic information including family size, geographic region and average age. In this report, we will create a model to estimate the causal impact of debit card ownership on household spending, utilizing propensity score methods to ensure model balance.
 
-
 ## Exploratory Data Analysis
 
-
-```{r, fig.width=15, fig.height=7}
+```{r, fig.width=15, fig.height=7, warning=FALSE, message=FALSE}
 # simple spending, 95 v 98
 
 
@@ -96,7 +92,7 @@ debit = debit %>%
 
 We begin our exploratory data analysis by looking at spending. In 1995 and 1998, households with debit cards tended to spend more than households without. The distribution of difference in household spending is centered at around 0, indicating most households spent about the same amount in 1998 as they did in 1995. The distribution of changes for households with debit cards has slighly more weight on the positive side, indicating that these households may have increased their spending slightly relative to non-debit card households. We also looked into spending as a percentage of income or of wealth, and the results were consistent with those above.
 
-```{r, include = FALSE}
+```{r, include = FALSE, warning=FALSE, message=FALSE}
 # no different -- don't include
 
 # spending as a % of income, wealth 1995 vs 1998
@@ -130,7 +126,7 @@ spend98_wealth = ggplot(debit %>% filter(wealth > 0), aes(x = spend98_pct_wealth
 grid.arrange(spend95_wealth, spend98_wealth, nrow = 2)
 ```
 
-```{r, fig.width=15, fig.height=7}
+```{r, fig.width=15, fig.height=7, warning=FALSE, message=FALSE}
 #categorical variables
 
 
@@ -273,7 +269,7 @@ We then examined relationships between demographic characteristics and 1998 spen
 debit = read_dta("data/debitcard199598.dta")
 ```
 
-```{r}
+```{r, warning=FALSE, message=FALSE}
 #Clean
 #any(unlist(lapply(debit,FUN=function(x){any(is.na(x))})))
 
@@ -303,7 +299,7 @@ size_t<-dim(data_t)[1]
 size_c<-dim(data_c)[1]
 ```
 
-```{r,include = FALSE}
+```{r,include = FALSE, warning=FALSE, message=FALSE}
 #Calculate ASD for Continuous Variables
 dif1<-apply(data.matrix(data_t[,n_indi]),2,mean)-
   apply(data.matrix(data_c[,n_indi]),2,mean)
@@ -335,7 +331,7 @@ ATT_1<-mean(data_t$spending1998-predict(model_control,newdata = data_t,type="res
 
 ```
 
-```{r, include = FALSE}
+```{r, include = FALSE, warning=FALSE, message=FALSE}
 #PS methods
 
 basicLog = glm(debit_card1998 ~ spending1995 + num_of_earners + average_age + family_size + geograph_area +  num_of_inhabitants + householder_age + householder_education + num_of_banks + interest_rate + income + wealth + cash_inventory, family = binomial(link="logit"), data = debit)
@@ -430,8 +426,6 @@ debit.CART_weight=bal.tab(olp.debit[,-c(1,2,16:21)],treat=olp.debit$debit_card19
 ATT_ipw_CART<-(olp.debit%>%filter(debit_card1998==TRUE)%>%summarise(mean=mean(spending1998)))-sum((olp.debit%>%filter(debit_card1998==FALSE))*(olp.debit%>%filter(debit_card1998==FALSE)%>%pull(ipw_CART)))/sum((olp.debit%>%filter(debit_card1998==FALSE)%>%pull(ipw_CART)))
 
 ATE_ipw_CART<-sum(olp.debit%>%filter(debit_card1998==TRUE)%>%pull(spending1998)/olp.debit%>%filter(debit_card1998==TRUE)%>%pull(ps_basicLog))/sum(1/(olp.debit%>%filter(debit_card1998==TRUE)%>%pull(ps_CART)))-sum(olp.debit%>%filter(debit_card1998==FALSE)%>%pull(spending1998)/(1-olp.debit%>%filter(debit_card1998==FALSE)%>%pull(ps_CART)))/sum(1/(1-olp.debit%>%filter(debit_card1998==FALSE)%>%pull(ps_CART)))
-
-
 
 #loveplots
 love.plot(debit.basicLog_weight,
@@ -533,7 +527,7 @@ dev.off()
 ![](overlap_check.png)
 We calculate propensity scores using general logistic regression. We then exclude the samples in the nonoverlapping region. One can see from the histogram that there is significant overlap between the propensity scores of the control and treatment groups; however, we expect this can be improved upon.
 
-```{r}
+```{r, warning=FALSE, message=FALSE}
 #Cobalt
 
 #weight
