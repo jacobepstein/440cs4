@@ -656,7 +656,7 @@ for (i in (1:B))
   #Resample Data
   tryCatch({
     b_index<-sample(1:dim(debit)[1],size=dim(debit)[1],replace = T)
-    bdata<-debit.ps[b_index,]
+    bdata<-debit[b_index,]
     bdata$cat1<-NULL
     bdata$cat2<-NULL
     bn_indi<-c(which(unlist(lapply(bdata,class))=="numeric"),which(unlist(lapply(bdata,class))=="integer"))
@@ -729,7 +729,7 @@ for (i in (1:B))
       b_IPW2[i]<-sum(bdata[btreated,"spending1998"]/bdata[btreated,"ps"])/sum(1/bdata[btreated,"ps"])-
         sum(bdata[-btreated,"spending1998"]/(1-bdata[-btreated,"ps"]))/sum(1/(1-bdata[-btreated,"ps"]))
       
-      #DR
+      #ATT DR
       b_DR1[i]<-mean(bdata[btreated,"spending1998"])-sum((bdata$spending1998*(1-bdata$debit_card1998)*
                                                          bdata$ps+predict(b_control,newdata=bdata,type="response")*
                                                          (bdata$debit_card1998-bdata$ps))/(1-bdata$ps))/treat_size
