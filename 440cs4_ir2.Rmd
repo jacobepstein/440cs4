@@ -772,7 +772,7 @@ ATE_SD_DR<-sqrt(var(b_DR2))
 ATE_SD_Mix<-sqrt(var(b_mix2))
 
 
-xtable(rbind(c(ATE_1,ATE_mix,ATE_ipw,ATE_DR),
+xtable(rbind(c(ATE_1,ATE_mix,ATE_ipw_bl,ATE_DR), #ATE_ipw_bl is a placeholder check this, no ATE_DR
 c(ATE_SD_reg_boot,ATE_SD_Mix,ATE_SD_IPW,ATE_SD_DR),
 c(ATT_1,ATT_mix,ATT_IPW,ATT_DR),
 c(ATT_SD_reg_boot,ATT_SD_Mix,ATT_SD_IPW,ATT_SD_DR)),digits=4)
