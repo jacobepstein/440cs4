@@ -665,10 +665,14 @@ for (i in (1:B))
     #Ensure both debit_card1998 and control group
     if(var(bdata$debit_card1998)>0)
     {
-      #Direct Regression control
+      
+      
+#Direct regression
+      
+      #control
       b_control<-glm(debit_card1998 ~ spending1995 + num_of_earners + average_age + family_size + geograph_area +  num_of_inhabitants + householder_age + householder_education + num_of_banks + interest_rate + income + wealth + cash_inventory, family = binomial(link="logit"), data = bdata %>% filter(debit_card1998 == 0))
       
-      #Direct Regression treated
+      #treated
       b_treated<-glm(debit_card1998 ~ spending1995 + num_of_earners + average_age + family_size + geograph_area +  num_of_inhabitants + householder_age + householder_education + num_of_banks + interest_rate + income + wealth + cash_inventory, family = binomial(link="logit"), data = bdata %>% filter(debit_card1998 == 1))
       
       #ATT calculation:
@@ -678,20 +682,19 @@ for (i in (1:B))
       b_reg2[i]<-(sum(subset(bdata,debit_card1998==1)$spending1998-predict(b_control,newdata = subset(bdata,debit_card1998==1),type="response"))-
           sum(subset(bdata,debit_card1998==0)$spending1998-predict(b_treated,newdata = subset(bdata,debit_card1998==0),type="response")))/dim(bdata)[1]
       
-      #PS: Stage 1
+      #PS
       b_model<-glm(debit_card1998 ~ spending1995 + num_of_earners + average_age + family_size + geograph_area +  num_of_inhabitants + householder_age + householder_education + num_of_banks + interest_rate + income + wealth + cash_inventory, family = binomial(link="logit"), data = bdata)
       
       bdata$ps<-fitted(b_model)
       
-      ###################################################
-      #Check Overlap: this step is not always necessary #
-      ###################################################  
+      #Check Overlap: this step is not always necessary 
       low_b<-max(min(bdata$ps[which(bdata$debit_card1998==1)]),
                  min(bdata$ps[which(bdata$debit_card1998==0)]))
       
       up_b<-min(max(bdata$ps[which(bdata$debit_card1998==1)]),
                 max(bdata$ps[which(bdata$debit_card1998==0)]))
       bdata<-subset(bdata,bdata$ps>=low_b&bdata$ps<=up_b)
+
       
 #Matching/Mix
       
@@ -720,6 +723,7 @@ for (i in (1:B))
       
       b_mix2[i]=b_ATE_matching_m$est-(-sum(mu3)+sum(mu4)-sum(mu5)+sum(mu6))/(6*dim(bdata)[1])
       
+      
 #IPW
       #Calculate Size
       btreated<-(1:dim(bdata)[1])[bdata$debit_card1998==1]
@@ -731,6 +735,7 @@ for (i in (1:B))
       b_IPW1[i]<-mean(bdata[btreated,"spending1998"])-sum(bdata[-btreated,"spending1998"]*bipw[-btreated])/sum(bipw[-btreated])
       
       b_IPW2[i]<-sum(bdata[btreated,"spending1998"]/bdata[btreated,"ps"])/sum(1/bdata[btreated,"ps"])-sum(bdata[-btreated,"spending1998"]/(1-bdata[-btreated,"ps"]))/sum(1/(1-bdata[-btreated,"ps"]))
+      
   
 #DR        
       #ATT DR
@@ -753,9 +758,8 @@ for (i in (1:B))
     }
     #Catching the Error
   },error=function(e){cat("ERROR:",conditionMessage(e),"\n")})
-  
-  
 }
+
 #Calculate Bootstrap Variance and SD
 ATT_SD_reg_boot<-sqrt(var(b_reg1))
 ATT_SD_IPW<-sqrt(var(b_IPW1))
