@@ -708,7 +708,7 @@ for (i in (1:B))
       #ATT: Matching with regression
       mu1=predict(b_control,newdata=bdata[control,],type="response")
       mu2=predict(b_control,newdata=bdata[b_ATT_matching_m$index.treated,],type="response")
-      b_mix1[i]=mean(bdata[treated,"spending1998"])-sum(bdata[control,"spending1998"]+mu2-mu1)/(6*treat_size)
+      b_mix1[i]=mean(bdata[treated,]$spending1998)-sum(bdata[control,"spending1998"]+mu2-mu1)/(6*treat_size)
       
       #ATE: Matching with regression
       mu3=predict(b_control,newdata=bdata[b_ATE_matching_m$index.control,],type="response")
