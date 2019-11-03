@@ -643,11 +643,8 @@ treats=treats %>% mutate_if(is.character, as.factor)
 
 
 ```{r}
-#################################
-#Bootstrap to Get the Variance  #
-#Takes time to run              #
-#################################
- 
+#Bootstrap to Get the Variance
+
 B=200
 b_reg1<-b_reg2<-b_IPW1<-b_IPW2<-numeric(B)
 b_DR1<-b_DR2<-b_mix1<-b_mix2<-numeric(B)
@@ -772,10 +769,10 @@ ATE_SD_DR<-sqrt(var(b_DR2))
 ATE_SD_Mix<-sqrt(var(b_mix2))
 
 
-xtable(rbind(c(ATE_1,ATE_mix,ATE_ipw_bl,ATE_DR), #ATE_ipw_bl is a placeholder check this, no ATE_DR
-c(ATE_SD_reg_boot,ATE_SD_Mix,ATE_SD_IPW,ATE_SD_DR),
-c(ATT_1,ATT_mix,ATT_IPW,ATT_DR),
-c(ATT_SD_reg_boot,ATT_SD_Mix,ATT_SD_IPW,ATT_SD_DR)),digits=4)
+#xtable(rbind(c(ATE_1,ATE_mix,ATE_ipw_bl,ATE_DR), #ATE_ipw_bl is a placeholder check this, no ATE_DR
+#c(ATE_SD_reg_boot,ATE_SD_Mix,ATE_SD_IPW,ATE_SD_DR),
+#c(ATT_1,ATT_mix,ATT_IPW,ATT_DR),
+#c(ATT_SD_reg_boot,ATT_SD_Mix,ATT_SD_IPW,ATT_SD_DR)),digits=4)
 
 
 #pdf("Residual_check.pdf",height=5,width=10)
