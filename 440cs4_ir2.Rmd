@@ -656,7 +656,7 @@ for (i in (1:B))
   #Resample Data
   tryCatch({
     b_index<-sample(1:dim(debit)[1],size=dim(debit)[1],replace = T)
-    bdata<-debit[b_index,]
+    bdata<-debit.ps[b_index,]
     bdata$cat1<-NULL
     bdata$cat2<-NULL
     bn_indi<-c(which(unlist(lapply(bdata,class))=="numeric"),which(unlist(lapply(bdata,class))=="integer"))
@@ -665,9 +665,9 @@ for (i in (1:B))
     #Ensure both debit_card1998 and control group
     if(var(bdata$debit_card1998)>0)
     {
-      #Direct Regression
+      #Direct Regression control
       b_control<-glm(debit_card1998 ~ spending1995 + num_of_earners + average_age + family_size + geograph_area +  num_of_inhabitants + householder_age + householder_education + num_of_banks + interest_rate + income + wealth + cash_inventory, family = binomial(link="logit"), data = bdata %>% filter(debit_card1998 == 0))
-      
+      #Direct Regression treated
       b_treated<-glm(debit_card1998 ~ spending1995 + num_of_earners + average_age + family_size + geograph_area +  num_of_inhabitants + householder_age + householder_education + num_of_banks + interest_rate + income + wealth + cash_inventory, family = binomial(link="logit"), data = bdata %>% filter(debit_card1998 == 1))
       
       #ATT calculation:
