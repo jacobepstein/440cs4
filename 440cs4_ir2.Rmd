@@ -358,6 +358,32 @@ plot(b,add=TRUE,col=rgb(0,0,1,0.5),main="Overlap Check",xlab="Estimated Propensi
 legend("topright",legend=c("Control Group","debit_card1998 Group"),col=c("red","blue"),pch=15,cex=0.7)
 dev.off()
 
+#randomForest
+a<-hist(debit.ps$ps_randomForest[which(debit.ps$debit_card1998==0)],breaks=50,freq=FALSE)
+a$counts<-a$counts/sum(a$counts)
+
+b<-hist(debit.ps$ps_randomForest[which(debit.ps$debit_card1998==1)],breaks=50,add=TRUE)
+b$counts<-b$counts/sum(b$counts)
+
+pdf("prophist_randomForest.pdf",width=8,height=6)
+plot(a,col=rgb(1,0,0,0.5),main="Overlap Check",cex.main=0.9,xlab="Estimated Propensity Score",ylab="Density",xlim=c(0,1))
+plot(b,add=TRUE,col=rgb(0,0,1,0.5),main="Overlap Check",xlab="Estimated Propensity Score",ylab="Density")
+legend("topright",legend=c("Control Group","debit_card1998 Group"),col=c("red","blue"),pch=15,cex=0.7)
+dev.off()
+
+#CART
+a<-hist(debit.ps$ps_CART[which(debit.ps$debit_card1998==0)],breaks=50,freq=FALSE)
+a$counts<-a$counts/sum(a$counts)
+
+b<-hist(debit.ps$ps_CART[which(debit.ps$debit_card1998==1)],breaks=50,add=TRUE)
+b$counts<-b$counts/sum(b$counts)
+
+pdf("prophist_CART.pdf",width=8,height=6)
+plot(a,col=rgb(1,0,0,0.5),main="Overlap Check",cex.main=0.9,xlab="Estimated Propensity Score",ylab="Density",xlim=c(0,1))
+plot(b,add=TRUE,col=rgb(0,0,1,0.5),main="Overlap Check",xlab="Estimated Propensity Score",ylab="Density")
+legend("topright",legend=c("Control Group","debit_card1998 Group"),col=c("red","blue"),pch=15,cex=0.7)
+dev.off()
+
 ################################################
 #  Exclude samples in nonoverlapping region   ##
 ################################################ 
@@ -525,6 +551,7 @@ boxplot(ori_asd, match_asd_1, match_asd_3, weight_bl_asd, weight_rf_asd, weight_
 dev.off()
 ```
 ![](overlap_check.png)
+
 We calculate propensity scores using general logistic regression. We then exclude the samples in the nonoverlapping region. One can see from the histogram that there is significant overlap between the propensity scores of the control and debit_card1998 groups; however, we expect this can be improved upon.
 
 ![](ASD_compare.png)
@@ -558,8 +585,10 @@ model_treated <- lm(outcome_formula(), data = treats)
 mu1 = predict(model_control, newdata=control_X, type = "response") 
 mu2 = predict(model_control, newdata=treat_X, type = "response") # How do I deal with the models having different actual covariates
 
-ATT_mix = mean(unlist(olp.debit[ATT_matching_1$index.treated, "spending1998"])) - sum(olp.debit[ATT_matching_1$index.control, "spending1998"] + mu2 - mu1, na.rm = TRUE)/(6*treat_size1)
+#ATT_mix = mean(unlist(olp.debit[ATT_matching_1$index.treated, "spending1998"])) - #sum(olp.debit[ATT_matching_1$index.control, "spending1998"] + mu2 - mu1)/(6*treat_size1)
 
+
+ATT_mix = mean(treat_Y) - sum(control_Y + mu2 - mu1)/(6*treat_size1)
 
 #ATE
 mu3 = predict(model_control, newdata=controls,type="response")
