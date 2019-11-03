@@ -667,11 +667,13 @@ for (i in (1:B))
     {
       #Direct Regression control
       b_control<-glm(debit_card1998 ~ spending1995 + num_of_earners + average_age + family_size + geograph_area +  num_of_inhabitants + householder_age + householder_education + num_of_banks + interest_rate + income + wealth + cash_inventory, family = binomial(link="logit"), data = bdata %>% filter(debit_card1998 == 0))
+      
       #Direct Regression treated
       b_treated<-glm(debit_card1998 ~ spending1995 + num_of_earners + average_age + family_size + geograph_area +  num_of_inhabitants + householder_age + householder_education + num_of_banks + interest_rate + income + wealth + cash_inventory, family = binomial(link="logit"), data = bdata %>% filter(debit_card1998 == 1))
       
       #ATT calculation:
       b_reg1[i]<-sum(bdata[bdata$debit_card1998==1,"spending1998"]-predict(b_control,newdata=bdata[bdata$debit_card1998==1,],type="response"))/sum(bdata$debit_card1998)
+      
       #ATE Calculation:
       b_reg2[i]<-(sum(subset(bdata,debit_card1998==1)$spending1998-predict(b_control,newdata = subset(bdata,debit_card1998==1),type="response"))-
           sum(subset(bdata,debit_card1998==0)$spending1998-predict(b_treated,newdata = subset(bdata,debit_card1998==0),type="response")))/dim(bdata)[1]
@@ -691,9 +693,8 @@ for (i in (1:B))
                 max(bdata$ps[which(bdata$debit_card1998==0)]))
       bdata<-subset(bdata,bdata$ps>=low_b&bdata$ps<=up_b)
       
-      #Matching
+#Matching/Mix
       
-      #More matching
       #1:1
       b_ATE_matching_m<-Match(Y=bdata$spending1998,Tr=bdata$debit_card1998,estimand = "ATE",
                         X=data.matrix(bdata[,-c(1,2,16)]),M=1,Weight = 1)
@@ -708,6 +709,7 @@ for (i in (1:B))
       #ATT: Matching with regression
       mu1=predict(b_control,newdata=bdata[control,],type="response")
       mu2=predict(b_control,newdata=bdata[b_ATT_matching_m$index.treated,],type="response")
+     
       b_mix1[i]=mean(bdata[treated,]$spending1998)-sum(bdata[control,"spending1998"]+mu2-mu1)/(6*treat_size)
       
       #ATE: Matching with regression
@@ -718,26 +720,25 @@ for (i in (1:B))
       
       b_mix2[i]=b_ATE_matching_m$est-(-sum(mu3)+sum(mu4)-sum(mu5)+sum(mu6))/(6*dim(bdata)[1])
       
-      #IPW
+#IPW
       #Calculate Size
       btreated<-(1:dim(bdata)[1])[bdata$debit_card1998==1]
       treat_size<-sum(bdata$debit_card1998)
       control_size<-dim(bdata)[1]-treat_size
       
       bipw<-bdata$ps/(1-bdata$ps)
-      b_IPW1[i]<-mean(bdata[btreated,"spending1998"])-sum(bdata[-btreated,"spending1998"]*bipw[-btreated])/sum(bipw[-btreated])
-      b_IPW2[i]<-sum(bdata[btreated,"spending1998"]/bdata[btreated,"ps"])/sum(1/bdata[btreated,"ps"])-
-        sum(bdata[-btreated,"spending1998"]/(1-bdata[-btreated,"ps"]))/sum(1/(1-bdata[-btreated,"ps"]))
       
+      b_IPW1[i]<-mean(bdata[btreated,"spending1998"])-sum(bdata[-btreated,"spending1998"]*bipw[-btreated])/sum(bipw[-btreated])
+      
+      b_IPW2[i]<-sum(bdata[btreated,"spending1998"]/bdata[btreated,"ps"])/sum(1/bdata[btreated,"ps"])-sum(bdata[-btreated,"spending1998"]/(1-bdata[-btreated,"ps"]))/sum(1/(1-bdata[-btreated,"ps"]))
+  
+#DR        
       #ATT DR
-      b_DR1[i]<-mean(bdata[btreated,"spending1998"])-sum((bdata$spending1998*(1-bdata$debit_card1998)*
-                                                         bdata$ps+predict(b_control,newdata=bdata,type="response")*
-                                                         (bdata$debit_card1998-bdata$ps))/(1-bdata$ps))/treat_size
+      b_DR1[i]<-mean(bdata[btreated,]$spending1998)-sum((bdata$spending1998*(1-bdata$debit_card1998)*bdata$ps+predict(b_control,newdata=bdata,type="response")*(bdata$debit_card1998-bdata$ps))/(1-bdata$ps))/treat_size
+      
       #ATE DR
-      b_DR2[i]<-mean(bdata$debit_card1998*bdata$spending1998/bdata$ps)-
-        mean((bdata$debit_card1998-bdata$ps)*predict(b_treated,newdata=bdata,type="response")/bdata$ps)-
-        mean((1-bdata$debit_card1998)*bdata$spending1998/(1-bdata$ps))-
-        mean((bdata$debit_card1998-bdata$ps)*predict(b_control,newdata=bdata,type="response")/(1-bdata$ps))
+      b_DR2[i]<-mean(bdata$debit_card1998*bdata$spending1998/bdata$ps)-mean((bdata$debit_card1998-bdata$ps)*predict(b_treated,newdata=bdata,type="response")/bdata$ps)-mean((1-bdata$debit_card1998)*bdata$spending1998/(1-bdata$ps))-mean((bdata$debit_card1998-bdata$ps)*predict(b_control,newdata=bdata,type="response")/(1-bdata$ps))
+      
       print(paste("==",i,"=="))
     }
     else
