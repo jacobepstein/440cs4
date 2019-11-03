@@ -676,7 +676,6 @@ for (i in (1:B))
       b_reg2[i]<-(sum(subset(bdata,debit_card1998==1)$spending1998-predict(b_control,newdata = subset(bdata,debit_card1998==1),type="response"))-
           sum(subset(bdata,debit_card1998==0)$spending1998-predict(b_treated,newdata = subset(bdata,debit_card1998==0),type="response")))/dim(bdata)[1]
       
-      
       #PS: Stage 1
       b_model<-glm(debit_card1998 ~ spending1995 + num_of_earners + average_age + family_size + geograph_area +  num_of_inhabitants + householder_age + householder_education + num_of_banks + interest_rate + income + wealth + cash_inventory, family = binomial(link="logit"), data = bdata)
       
@@ -700,15 +699,16 @@ for (i in (1:B))
                         X=data.matrix(bdata[,-c(1,2,16)]),M=1,Weight = 1)
       
       b_ATT_matching_m<-Match(Y=bdata$spending1998,Tr=bdata$debit_card1998,estimand = "ATT",
-                            X=data.matrix(olp.debit[,-c(1,2,16)]),M=1,Weight = 1)
+                              X=data.matrix(bdata[,-c(1,2,16)]),M=1,Weight = 1)
       treated<-unique(b_ATT_matching_m$index.treated)
       control<-b_ATT_matching_m$index.control
       treat_size<-length(treated)
       control_size<-dim(bdata)[1]-treat_size
       
+      #ATT: Matching with regression
       mu1=predict(b_control,newdata=bdata[control,],type="response")
       mu2=predict(b_control,newdata=bdata[b_ATT_matching_m$index.treated,],type="response")
-      b_mix1[i]=mean(bdata[treated,"debit_card1998"])-sum(bdata[control,"debit_card1998"]+mu2-mu1)/(6*treat_size)
+      b_mix1[i]=mean(bdata[treated,"spending1998"])-sum(bdata[control,"spending1998"]+mu2-mu1)/(6*treat_size)
       
       #ATE: Matching with regression
       mu3=predict(b_control,newdata=bdata[b_ATE_matching_m$index.control,],type="response")
