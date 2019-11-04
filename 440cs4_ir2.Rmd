@@ -599,14 +599,14 @@ model_treated <- lm(outcome_formula(), data = treats)
 mu1 = predict(model_control, newdata=control_X, type = "response") 
 mu2 = predict(model_control, newdata=treat_X, type = "response") # How do I deal with the models having different actual covariates
 
-ATT_mix = mean(treat_Y) - sum(control_Y + mu2 - mu1)/(6*treat_size1)
+ATT_mix=mean(olp.debit %>% filter(debit_card1998 == 1) %>% dplyr::select(spending1998) %>% unlist())-sum(olp.debit[ATT_matching_1$index.control,"spending1998"]+mu2-mu1)/(treat_size1)
 
 #ATE
 mu3 = predict(model_control, newdata=controls,type="response")
 mu4 = predict(model_control, newdata=treats,type="response")
 mu5 =predict(model_treated, newdata=controls,type="response")
 mu6 = predict(model_treated, newdata=treats,type="response")
-ATE_mix = ATE_matching_1$est - (-sum(mu3) + sum(mu4) - sum(mu5) + sum(mu6))/(6*dim(olp.debit)[1])
+ATE_mix = ATE_matching_1$est - (-sum(mu3) + sum(mu4) - sum(mu5) + sum(mu6))/(dim(olp.debit)[1])
 
 #Regression Adjustment with XGBoost
 model_control_boost <- xgboost(data=data.matrix(control_X), label = data.matrix(control_Y), nrounds = 30, verbose = 0)
@@ -616,14 +616,14 @@ model_treat_boost <- xgboost(data=data.matrix(treat_X), label = data.matrix(trea
 mu1=predict(model_control_boost,newdata=data.matrix(control_X),type="response")
 mu2=predict(model_control_boost,newdata=data.matrix(treat_X),type="response")
 
-ATT_mix_boost=mean(olp.debit %>% filter(debit_card1998 == 1) %>% dplyr::select(spending1998) %>% unlist())-sum(olp.debit[ATT_matching_1$index.control,"spending1998"]+mu2-mu1)/(6*treat_size1)
+ATT_mix_boost=mean(olp.debit %>% filter(debit_card1998 == 1) %>% dplyr::select(spending1998) %>% unlist())-sum(olp.debit[ATT_matching_1$index.control,"spending1998"]+mu2-mu1)/(treat_size1)
 
 #ATE
 mu3=predict(model_control_boost,newdata=data.matrix(control_X),type="response")
 mu4=predict(model_control_boost,newdata=data.matrix(treat_X),type="response")
 mu5=predict(model_treat_boost,newdata=data.matrix(control_X),type="response")
 mu6=predict(model_treat_boost,newdata=data.matrix(treat_X),type="response")
-ATE_mix_boost=ATE_matching_1$est-(-sum(mu3)+sum(mu4)-sum(mu5)+sum(mu6))/(6*dim(olp.debit)[1])
+ATE_mix_boost=ATE_matching_1$est-(-sum(mu3)+sum(mu4)-sum(mu5)+sum(mu6))/(dim(olp.debit)[1])
 
 
 #Random Forest
@@ -636,14 +636,14 @@ model_treat_forest <- randomForest(spending1998 ~ spending1995 + num_of_earners 
 mu1=predict(model_control_forest,newdata=control_X,type="response")
 mu2=predict(model_control_forest,newdata=treat_X,type="response")
 
-ATT_mix_forest=mean(olp.debit %>% filter(debit_card1998 == 1) %>% dplyr::select(spending1998) %>% unlist())-sum(olp.debit[ATT_matching_1$index.control,"spending1998"]+mu2-mu1)/(6*treat_size1)
+ATT_mix_forest=mean(olp.debit %>% filter(debit_card1998 == 1) %>% dplyr::select(spending1998) %>% unlist())-sum(olp.debit[ATT_matching_1$index.control,"spending1998"]+mu2-mu1)/(treat_size1)
 
 #ATE
 mu3=predict(model_control_forest,newdata=control_X,type="response")
 mu4=predict(model_control_forest,newdata=treat_X,type="response")
 mu5=predict(model_treat_forest,newdata=control_X,type="response")
 mu6=predict(model_treat_forest,newdata=treat_X,type="response")
-ATE_mix_forest=ATE_matching_1$est-(-sum(mu3)+sum(mu4)-sum(mu5)+sum(mu6))/(6*dim(olp.debit)[1])
+ATE_mix_forest=ATE_matching_1$est-(-sum(mu3)+sum(mu4)-sum(mu5)+sum(mu6))/(dim(olp.debit)[1])
 
 data.frame(ATT_mix,
       ATE_mix,
@@ -737,7 +737,7 @@ for (i in (1:B))
       mu1=predict(b_control,newdata=bdata[control,],type="response")
       mu2=predict(b_control,newdata=bdata[b_ATT_matching_m$index.treated,],type="response")
      
-      b_mix1[i]=mean(bdata[treated,]$spending1998)-sum(bdata[control,"spending1998"]+mu2-mu1)/(6*treat_size)
+      b_mix1[i]=mean(bdata[treated,]$spending1998)-sum(bdata[control,"spending1998"]+mu2-mu1)/(treat_size)
       
       #ATE: Matching with regression
       mu3=predict(b_control,newdata=bdata[b_ATE_matching_m$index.control,],type="response")
@@ -745,7 +745,7 @@ for (i in (1:B))
       mu5=predict(b_treated,newdata=bdata[b_ATE_matching_m$index.control,],type="response")
       mu6=predict(b_treated,newdata=bdata[b_ATE_matching_m$index.treated,],type="response")
       
-      b_mix2[i]=b_ATE_matching_m$est-(-sum(mu3)+sum(mu4)-sum(mu5)+sum(mu6))/(6*dim(bdata)[1])
+      b_mix2[i]=b_ATE_matching_m$est-(-sum(mu3)+sum(mu4)-sum(mu5)+sum(mu6))/(dim(bdata)[1])
       
       
 #IPW
