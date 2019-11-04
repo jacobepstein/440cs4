@@ -405,7 +405,7 @@ olp.debit= olp.debit %>%
 #weighting basic Log
 debit.basicLog_weight=bal.tab(olp.debit[,-c(1,2,16:21)],treat=olp.debit$debit_card1998,method="weighting", weights=olp.debit$ipw_bl,estimand="ATT")
 
-ATT_ipw_bl<-(olp.debit%>%filter(debit_card1998==TRUE)%>%summarise(mean=mean(spending1998)))-sum((olp.debit%>%filter(debit_card1998==FALSE))*(olp.debit%>%filter(debit_card1998==FALSE)%>%pull(ipw_bl)))/sum((olp.debit%>%filter(debit_card1998==FALSE)%>%pull(ipw_bl)))
+ATT_ipw_bl<-(olp.debit%>%filter(debit_card1998==TRUE)%>%summarise(mean=mean(spending1998)))-sum((olp.debit%>%filter(debit_card1998==FALSE))%>%pull(ipw_bl)*olp.debit%>%filter(debit_card1998==FALSE)%>%pull(spending1998))/sum((olp.debit%>%filter(debit_card1998==FALSE)%>%pull(ipw_bl)))
 
 ATE_ipw_bl<-sum(olp.debit%>%filter(debit_card1998==TRUE)%>%pull(spending1998)/olp.debit%>%filter(debit_card1998==TRUE)%>%pull(ps_basicLog))/sum(1/(olp.debit%>%filter(debit_card1998==TRUE)%>%pull(ps_basicLog)))-sum(olp.debit%>%filter(debit_card1998==FALSE)%>%pull(spending1998)/(1-olp.debit%>%filter(debit_card1998==FALSE)%>%pull(ps_basicLog)))/sum(1/(1-olp.debit%>%filter(debit_card1998==FALSE)%>%pull(ps_basicLog)))
 
@@ -427,7 +427,7 @@ olp.debit= olp.debit %>%
 
 debit.randomForest_weight=bal.tab(olp.debit[,-c(1,2,16:21)],treat=olp.debit$debit_card1998,method="weighting", weights=olp.debit$ipw_rf,estimand="ATT")
 
-ATT_ipw_rf<-(olp.debit%>%filter(debit_card1998==TRUE)%>%summarise(mean=mean(spending1998)))-sum((olp.debit%>%filter(debit_card1998==FALSE))*(olp.debit%>%filter(debit_card1998==FALSE)%>%pull(ipw_rf)))/sum((olp.debit%>%filter(debit_card1998==FALSE)%>%pull(ipw_rf)))
+ATT_ipw_rf<-(olp.debit%>%filter(debit_card1998==TRUE)%>%summarise(mean=mean(spending1998)))-sum((olp.debit%>%filter(debit_card1998==FALSE))%>%pull(ipw_rf)*olp.debit%>%filter(debit_card1998==FALSE)%>%pull(spending1998))/sum((olp.debit%>%filter(debit_card1998==FALSE)%>%pull(ipw_rf)))
 
 ATE_ipw_rf<-sum(olp.debit%>%filter(debit_card1998==TRUE)%>%pull(spending1998)/olp.debit%>%filter(debit_card1998==TRUE)%>%pull(ps_basicLog))/sum(1/(olp.debit%>%filter(debit_card1998==TRUE)%>%pull(ps_randomForest)))-sum(olp.debit%>%filter(debit_card1998==FALSE)%>%pull(spending1998)/(1-olp.debit%>%filter(debit_card1998==FALSE)%>%pull(ps_randomForest)))/sum(1/(1-olp.debit%>%filter(debit_card1998==FALSE)%>%pull(ps_randomForest)))
 
@@ -450,7 +450,7 @@ olp.debit= olp.debit %>%
 
 debit.CART_weight=bal.tab(olp.debit[,-c(1,2,16:21)],treat=olp.debit$debit_card1998,method="weighting", weights=olp.debit$ipw_CART,estimand="ATT")
 
-ATT_ipw_CART<-(olp.debit%>%filter(debit_card1998==TRUE)%>%summarise(mean=mean(spending1998)))-sum((olp.debit%>%filter(debit_card1998==FALSE))*(olp.debit%>%filter(debit_card1998==FALSE)%>%pull(ipw_CART)))/sum((olp.debit%>%filter(debit_card1998==FALSE)%>%pull(ipw_CART)))
+ATT_ipw_CART<-(olp.debit%>%filter(debit_card1998==TRUE)%>%summarise(mean=mean(spending1998)))-sum((olp.debit%>%filter(debit_card1998==FALSE))%>%pull(ipw_CART)*olp.debit%>%filter(debit_card1998==FALSE)%>%pull(spending1998))/sum((olp.debit%>%filter(debit_card1998==FALSE)%>%pull(ipw_CART)))
 
 ATE_ipw_CART<-sum(olp.debit%>%filter(debit_card1998==TRUE)%>%pull(spending1998)/olp.debit%>%filter(debit_card1998==TRUE)%>%pull(ps_basicLog))/sum(1/(olp.debit%>%filter(debit_card1998==TRUE)%>%pull(ps_CART)))-sum(olp.debit%>%filter(debit_card1998==FALSE)%>%pull(spending1998)/(1-olp.debit%>%filter(debit_card1998==FALSE)%>%pull(ps_CART)))/sum(1/(1-olp.debit%>%filter(debit_card1998==FALSE)%>%pull(ps_CART)))
 
@@ -673,8 +673,8 @@ ATE_DR <-mean(olp.debit$debit_card1998*olp.debit$spending1998/olp.debit$ps_basic
 #Bootstrap to Get the Variance
 
 B=200
-b_reg1<-b_reg2<-b_IPW1<-b_IPW2<-numeric(B)
-b_DR1<-b_DR2<-b_mix1<-b_mix2<-numeric(B)
+b_IPW1<-b_IPW2<-numeric(B)
+b_DR1<-b_DR2<-b_mix1<-b_mix2<-b_mix1_boost<-b_mix2_boost<-b_mix1_forest<-b_mix2_forest<-numeric(B)
 for (i in (1:B))
 {
   #Resample Data
@@ -689,23 +689,6 @@ for (i in (1:B))
     #Ensure both debit_card1998 and control group
     if(var(bdata$debit_card1998)>0)
     {
-      
-      
-#Direct regression
-      
-      #control
-      b_control<-glm(debit_card1998 ~ spending1995 + num_of_earners + average_age + family_size + geograph_area +  num_of_inhabitants + householder_age + householder_education + num_of_banks + interest_rate + income + wealth + cash_inventory, family = binomial(link="logit"), data = bdata %>% filter(debit_card1998 == 0))
-      
-      #treated
-      b_treated<-glm(debit_card1998 ~ spending1995 + num_of_earners + average_age + family_size + geograph_area +  num_of_inhabitants + householder_age + householder_education + num_of_banks + interest_rate + income + wealth + cash_inventory, family = binomial(link="logit"), data = bdata %>% filter(debit_card1998 == 1))
-      
-      #ATT calculation:
-      b_reg1[i]<-sum(bdata[bdata$debit_card1998==1,"spending1998"]-predict(b_control,newdata=bdata[bdata$debit_card1998==1,],type="response"))/sum(bdata$debit_card1998)
-      
-      #ATE Calculation:
-      b_reg2[i]<-(sum(subset(bdata,debit_card1998==1)$spending1998-predict(b_control,newdata = subset(bdata,debit_card1998==1),type="response"))-
-          sum(subset(bdata,debit_card1998==0)$spending1998-predict(b_treated,newdata = subset(bdata,debit_card1998==0),type="response")))/dim(bdata)[1]
-      
       #PS
       b_model<-glm(debit_card1998 ~ spending1995 + num_of_earners + average_age + family_size + geograph_area +  num_of_inhabitants + householder_age + householder_education + num_of_banks + interest_rate + income + wealth + cash_inventory, family = binomial(link="logit"), data = bdata)
       
@@ -734,10 +717,13 @@ for (i in (1:B))
       control_size<-dim(bdata)[1]-treat_size
       
       #ATT: Matching with regression
+      b_control <- lm(outcome_formula(), data = bdata[control,])
+      b_treated <- lm(outcome_formula(), data = bdata[b_ATT_matching_m$index.treated,])
+      
       mu1=predict(b_control,newdata=bdata[control,],type="response")
       mu2=predict(b_control,newdata=bdata[b_ATT_matching_m$index.treated,],type="response")
      
-      b_mix1[i]=mean(bdata[treated,]$spending1998)-sum(bdata[control,"spending1998"]+mu2-mu1)/(treat_size)
+      b_mix1[i]=mean(bdata %>% filter(debit_card1998 == 1) %>% dplyr::select(spending1998) %>% unlist())-sum(bdata[control,]$spending1998+mu2-mu1)/(length(b_ATT_matching_m$index.treated))
       
       #ATE: Matching with regression
       mu3=predict(b_control,newdata=bdata[b_ATE_matching_m$index.control,],type="response")
@@ -747,6 +733,50 @@ for (i in (1:B))
       
       b_mix2[i]=b_ATE_matching_m$est-(-sum(mu3)+sum(mu4)-sum(mu5)+sum(mu6))/(dim(bdata)[1])
       
+      controls = olp.debit[b_ATT_matching_m$index.control, ]
+      control_X = controls[,-c(1,2,16:21)]
+      control_Y = controls$spending1998
+      treats = olp.debit[b_ATT_matching_m$index.treated, ]
+      treat_X = treats[,-c(1,2,16:21)]
+      treat_Y = treats$spending1998
+      
+      model_control_boost <- xgboost(data=data.matrix(control_X), label = data.matrix(control_Y), nrounds = 30, verbose = 0)
+      model_treat_boost <- xgboost(data=data.matrix(treat_X), label = data.matrix(treat_Y), nrounds = 30, verbose = 0)
+
+      #ATT: Matching with XGboost Regression Adjustment
+      mu1=predict(model_control_boost,newdata=data.matrix(control_X),type="response")
+      mu2=predict(model_control_boost,newdata=data.matrix(treat_X),type="response")
+     
+      b_mix1_boost[i]=mean(bdata %>% filter(debit_card1998 == 1) %>% dplyr::select(spending1998) %>% unlist())-sum(bdata[control,]$spending1998+mu2-mu1)/(length(b_ATT_matching_m$index.treated))
+      
+      #ATE: Matching with XGboost Regression Adjustment
+      mu3=predict(model_control_boost,newdata=data.matrix(control_X),type="response")
+      mu4=predict(model_control_boost,newdata=data.matrix(treat_X),type="response")
+      mu5=predict(model_treat_boost,newdata=data.matrix(control_X),type="response")
+      mu6=predict(model_treat_boost,newdata=data.matrix(treat_X),type="response")
+      
+      b_mix2_boost[i]=b_ATE_matching_m$est-(-sum(mu3)+sum(mu4)-sum(mu5)+sum(mu6))/(dim(bdata)[1])
+      
+      
+      # model_control_forest <- randomForest(spending1998 ~ spending1995 + num_of_earners + average_age + family_size + geograph_area +  num_of_inhabitants + householder_age + householder_education + num_of_banks + interest_rate + income + wealth + cash_inventory, data = controls)
+      # 
+      # model_treat_forest <- randomForest(spending1998 ~ spending1995 + num_of_earners + average_age + family_size + geograph_area +  num_of_inhabitants + householder_age + householder_education + num_of_banks + interest_rate + income + wealth + cash_inventory, data = treats)
+      # 
+      # #ATT
+      # mu1=predict(model_control_forest,newdata=control_X,type="response")
+      # mu2=predict(model_control_forest,newdata=treat_X,type="response")
+      # 
+      # b_mix1_forest[i]= mean(bdata %>% filter(debit_card1998 == 1) %>% dplyr::select(spending1998) %>% unlist())-sum(bdata[control,]$spending1998+mu2-mu1)/(length(b_ATT_matching_m$index.treated))
+      # 
+      # 
+      # #ATE
+      # mu3=predict(model_control_forest,newdata=control_X,type="response")
+      # mu4=predict(model_control_forest,newdata=treat_X,type="response")
+      # mu5=predict(model_treat_forest,newdata=control_X,type="response")
+      # mu6=predict(model_treat_forest,newdata=treat_X,type="response")
+      # 
+      # b_mix2_forest[i]=b_ATE_matching_m$est-(-sum(mu3)+sum(mu4)-sum(mu5)+sum(mu6))/(dim(bdata)[1])
+    
       
 #IPW
       #Calculate Size
@@ -756,7 +786,7 @@ for (i in (1:B))
       
       bipw<-bdata$ps/(1-bdata$ps)
       
-      b_IPW1[i]<-mean(bdata[btreated,"spending1998"])-sum(bdata[-btreated,"spending1998"]*bipw[-btreated])/sum(bipw[-btreated])
+      b_IPW1[i]<-mean(bdata[btreated,]$spending1998, na.rm = TRUE)-sum(bdata[-btreated,"spending1998"]*bipw[-btreated])/sum(bipw[-btreated])
       
       b_IPW2[i]<-sum(bdata[btreated,"spending1998"]/bdata[btreated,"ps"])/sum(1/bdata[btreated,"ps"])-sum(bdata[-btreated,"spending1998"]/(1-bdata[-btreated,"ps"]))/sum(1/(1-bdata[-btreated,"ps"]))
       
@@ -785,20 +815,22 @@ for (i in (1:B))
 }
 
 #Calculate Bootstrap Variance and SD
-ATT_SD_reg_boot<-sqrt(var(b_reg1))
 ATT_SD_IPW<-sqrt(var(b_IPW1))
 ATT_SD_DR<-sqrt(var(b_DR1))
 ATT_SD_Mix<-sqrt(var(b_mix1))
+ATT_SD_Mix_boost<-sqrt(var(b_mix1_boost))
+ATT_SD_Mix_forest<-sqrt(var(b_mix1_forest))
 
-ATE_SD_reg_boot<-sqrt(var(b_reg2))
 ATE_SD_IPW<-sqrt(var(b_IPW2))
 ATE_SD_DR<-sqrt(var(b_DR2))
 ATE_SD_Mix<-sqrt(var(b_mix2))
+ATE_SD_Mix_boost<-sqrt(var(b_mix2_boost))
+ATE_SD_Mix_forest<-sqrt(var(b_mix2_forest))
 
-xtable(rbind(c(ATE_1,ATE_mix,ATE_ipw_bl,ATE_DR),
-c(ATE_SD_reg_boot,ATE_SD_Mix,ATE_SD_IPW,ATE_SD_DR),
-c(ATT_1,ATT_mix,ATT_IPW,ATT_DR),
-c(ATT_SD_reg_boot,ATT_SD_Mix,ATT_SD_IPW,ATT_SD_DR)),digits=4)
+xtable(rbind(c(ATE_ipw_bl,ATE_DR,ATE_mix,ATE_mix_boost),
+c(ATE_SD_IPW,ATE_SD_DR,ATE_SD_Mix,ATE_SD_Mix_boost),
+c(ATT_ipw_bl,ATT_DR,ATT_mix,ATT_mix_boost),
+c(ATT_SD_IPW,ATT_SD_DR,ATT_SD_Mix,ATT_SD_Mix_boost)),digits=4)
 
 
 #pdf("Residual_check.pdf",height=5,width=10)
