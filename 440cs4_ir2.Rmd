@@ -563,18 +563,6 @@ match.df3 = as.data.frame(match_asd_3)
 ori.match3.df = cbind(ori.df, match.df3)
 
 ggplot(data = ori.match3.df, aes(y = rownames(ori.match1.df))) + geom_point(aes(x = match_asd_1, colour = "matched")) + geom_point(aes(x = ori_asd, colour = "original")) + xlab("Absolute Standardized Difference") +ylab("Covariate")
-
-
-#Double Robustness
-#ATT DR
-ATT_DR<-mean(olp.debit["spending1998","debit_card1998"])-sum((olp.debit$debit_card1998*(1-olp.debit$spending1998)*
-                                  olp.debit$ps+predict(model_control,newdata=olp.debit,type="response")*
-                                               (olp.debit$spending1998-olp.debit$ps))/(1-olp.debit$ps))/treat_size
-#ATE DR
-ATE_DR<-mean(olp.debit$spending1998*olp.debit$debit_card1998/olp.debit$ps_basicLog)-
-    mean((olp.debit$spending1998-olp.debit$ps_basicLog)*predict(model_treated,newdata=olp.debit,type="response")/olp.debit$ps_basicLog)-
-    mean((1-olp.debit$spending1998)*olp.debit$debit_card1998/(1-olp.debit$ps_basicLog))-
-    mean((olp.debit$spending1998-olp.debit$ps_basicLog)*predict(model_control,newdata=olp.debit,type="response")/(1-olp.debit$ps_basicLog))
 ```
 ![](overlap_check.png)
 
@@ -674,7 +662,7 @@ olp.debit_modelling <- olp.debit %>% filter(num_of_earners != 5) %>% filter(fami
 ATT_DR<-mean(olp.debit[treated1,]$spending1998, na.rm = TRUE)-sum((olp.debit_modelling$spending1998*(1-olp.debit_modelling$debit_card1998)*olp.debit_modelling$ps_basicLog+predict(model_control,newdata=olp.debit_modelling,type="response")*(olp.debit_modelling$debit_card1998-olp.debit_modelling$ps_basicLog))/(1-olp.debit_modelling$ps_basicLog))/length(treated1)
       
 #ATE DR
-ATE_DR <-mean(olp.debit$debit_card1998*olp.debit$spending1998/olp.debit$ps_basicLog)-mean((olp.debit$debit_card1998-olp.debit$ps_basicLog)*predict(b_treated,newdata=olp.debit,type="response")/olp.debit$ps_basicLog)-mean((1-olp.debit$debit_card1998)*olp.debit$spending1998/(1-olp.debit$ps_basicLog))-mean((olp.debit$debit_card1998-olp.debit$ps_basicLog)*predict(b_control,newdata=olp.debit,type="response")/(1-olp.debit$ps_basicLog))
+ATE_DR <-mean(olp.debit$debit_card1998*olp.debit$spending1998/olp.debit$ps_basicLog)-mean((olp.debit_modelling$debit_card1998-olp.debit_modelling$ps_basicLog)*predict(model_treated,newdata=olp.debit_modelling,type="response")/olp.debit_modelling$ps_basicLog)-mean((1-olp.debit_modelling$debit_card1998)*olp.debit_modelling$spending1998/(1-olp.debit_modelling$ps_basicLog))-mean((olp.debit_modelling$debit_card1998-olp.debit_modelling$ps_basicLog)*predict(model_control,newdata=olp.debit_modelling,type="response")/(1-olp.debit_modelling$ps_basicLog))
 ```
 
 
