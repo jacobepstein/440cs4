@@ -585,6 +585,7 @@ outcome_formula = function()
 }
 
 controls = olp.debit[ATT_matching_1$index.control, ]
+control_X = controls[,-c(1,2,16:21)]
 control_Y = controls$spending1998
 
 treats = olp.debit[ATT_matching_1$index.treated, ] %>% filter(num_of_earners != 5) %>% filter(family_size != 6)
@@ -832,6 +833,16 @@ c(ATE_SD_IPW,ATE_SD_DR,ATE_SD_Mix,ATE_SD_Mix_boost),
 c(ATT_ipw_bl,ATT_DR,ATT_mix,ATT_mix_boost),
 c(ATT_SD_IPW,ATT_SD_DR,ATT_SD_Mix,ATT_SD_Mix_boost)),digits=4)
 
+# Get only those that worked
+ATT_SD_IPW<-ATT_SD_IPW[ATT_SD_IPW != 0]
+ATT_SD_DR<-ATT_SD_IPW[ATT_SD_IPW != 0]
+ATT_SD_Mix<-ATT_SD_IPW[ATT_SD_IPW != 0]
+ATT_SD_Mix_boost<-ATT_SD_IPW[ATT_SD_IPW != 0]
+
+ATT = c(ATT_ipw_bl,ATT_DR,ATT_mix,ATT_mix_boost) %>%unlist()
+ATT_SD = c(ATT_SD_IPW,ATT_SD_DR,ATT_SD_Mix,ATT_SD_Mix_boost) %>%unlist()
+AOT = debit %>% filter(debit_card1998 == 1) %>% dplyr::select(spending1998) %>% summarize(mean = mean(spending1998))
+AOT_over_AOT = ATT / AOT %>% unlist %>%as.numeric()
 
 #pdf("Residual_check.pdf",height=5,width=10)
 #par(mfrow=c(1,2))
@@ -842,7 +853,6 @@ c(ATT_SD_IPW,ATT_SD_DR,ATT_SD_Mix,ATT_SD_Mix_boost)),digits=4)
 
 ## Conclusions
 ![](xtable.png)
-
 
 From our model, we can conclude that having a debit card caused the Italian households with debit cards to increase their spending by about $460 per month. 
 
