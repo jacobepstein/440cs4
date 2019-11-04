@@ -494,20 +494,24 @@ Moving forward with 1:1 matching, we see that the absolute mean differences are 
 We attempt to fit models on top of the 1:1 matching with replacement. We first use a basic linear model before fitting more flexible models, random forest and extreme gradient boosting.
 
 ```{r}
+#Model set-up
 outcome_formula = function()
 {
   return(spending1998 ~ spending1995 + num_of_earners + average_age + family_size + geograph_area + num_of_inhabitants + householder_age + householder_education + num_of_banks + interest_rate + income + wealth + cash_inventory)
 }
 
 controls = olp.debit[ATT_matching_1$index.control, ]
-control_X = controls[, -c(1, 2, 16:21)]
+control_X = controls[, -c(1,2,16:21)]
 control_Y = controls$spending1998
 
 treats = olp.debit[ATT_matching_1$index.treated, ] %>% filter(num_of_earners != 5) %>% filter(family_size != 6)
 treat_X = treats[,-c(1,2,16:21)]
 treat_Y = treats$spending1998
 
-#Linear Model
+
+#Regression Adjustment with Linear Model
+
+#Models
 model_control <- lm(outcome_formula(), data = controls)
 model_treated <- lm(outcome_formula(), data = treats)
 
@@ -524,7 +528,10 @@ mu5 =predict(model_treated, newdata=controls,type="response")
 mu6 = predict(model_treated, newdata=treats,type="response")
 ATE_mix = ATE_matching_1$est - (-sum(mu3) + sum(mu4) - sum(mu5) + sum(mu6))/(dim(olp.debit)[1])
 
+
 #Regression Adjustment with XGBoost
+
+#Models
 model_control_boost <- xgboost(data=data.matrix(control_X), label = data.matrix(control_Y), nrounds = 30, verbose = 0)
 model_treat_boost <- xgboost(data=data.matrix(treat_X), label = data.matrix(treat_Y), nrounds = 30, verbose = 0)
 
@@ -542,8 +549,9 @@ mu6=predict(model_treat_boost,newdata=data.matrix(treat_X),type="response")
 ATE_mix_boost=ATE_matching_1$est-(-sum(mu3)+sum(mu4)-sum(mu5)+sum(mu6))/(dim(olp.debit)[1])
 
 
-#Random Forest
+#Regression Adjustment with Random Forest
 
+#Models
 model_control_forest <- randomForest(spending1998 ~ spending1995 + num_of_earners + average_age + family_size + geograph_area +  num_of_inhabitants + householder_age + householder_education + num_of_banks + interest_rate + income + wealth + cash_inventory, data = controls)
 
 model_treat_forest <- randomForest(spending1998 ~ spending1995 + num_of_earners + average_age + family_size + geograph_area +  num_of_inhabitants + householder_age + householder_education + num_of_banks + interest_rate + income + wealth + cash_inventory, data = treats)
@@ -561,10 +569,10 @@ mu5=predict(model_treat_forest,newdata=control_X,type="response")
 mu6=predict(model_treat_forest,newdata=treat_X,type="response")
 ATE_mix_forest=ATE_matching_1$est-(-sum(mu3)+sum(mu4)-sum(mu5)+sum(mu6))/(dim(olp.debit)[1])
 
-data.frame(ATT_mix,
-      ATE_mix,
-      ATT_mix_boost, 
-      ATE_mix_boost, ATT_mix_forest, ATE_mix_forest)
+# data.frame(ATT_mix,
+#       ATE_mix,
+#       ATT_mix_boost, 
+#       ATE_mix_boost, ATT_mix_forest, ATE_mix_forest)
 ```
 
 ```{r}
@@ -588,7 +596,7 @@ ATE_DR <-mean(olp.debit$debit_card1998*olp.debit$spending1998/olp.debit$ps_basic
 ```{r}
 #Bootstrap to Get the Variance
 
-B=200
+B=500
 b_IPW1<-b_IPW2<-numeric(B)
 b_DR1<-b_DR2<-b_mix1<-b_mix2<-b_mix1_boost<-b_mix2_boost<-b_mix1_forest<-b_mix2_forest<-numeric(B)
 for (i in (1:B))
@@ -714,7 +722,7 @@ for (i in (1:B))
       #ATE DR
       b_DR2[i]<-mean(bdata$debit_card1998*bdata$spending1998/bdata$ps)-mean((bdata$debit_card1998-bdata$ps)*predict(b_treated,newdata=bdata,type="response")/bdata$ps)-mean((1-bdata$debit_card1998)*bdata$spending1998/(1-bdata$ps))-mean((bdata$debit_card1998-bdata$ps)*predict(b_control,newdata=bdata,type="response")/(1-bdata$ps))
       
-      print(paste("==",i,"=="))
+      #print(paste("==",i,"=="))
     }
     else
     {
@@ -724,10 +732,10 @@ for (i in (1:B))
       b_IPW2[i]<-NA
       b_DR2[i]<-NA
       b_reg2[i]<-NA
-      print("non overlap")
+     #print("non overlap")
     }
     #Catching the Error
-  },error=function(e){cat("ERROR:",conditionMessage(e),"\n")})
+  },error=function(e){})
 }
 
 #Calculate Bootstrap Variance and SD
@@ -735,19 +743,29 @@ ATT_SD_IPW<-sqrt(var(b_IPW1))
 ATT_SD_DR<-sqrt(var(b_DR1))
 ATT_SD_Mix<-sqrt(var(b_mix1))
 ATT_SD_Mix_boost<-sqrt(var(b_mix1_boost))
-ATT_SD_Mix_forest<-sqrt(var(b_mix1_forest))
+# ATT_SD_Mix_forest<-sqrt(var(b_mix1_forest))
 
 ATE_SD_IPW<-sqrt(var(b_IPW2))
 ATE_SD_DR<-sqrt(var(b_DR2))
 ATE_SD_Mix<-sqrt(var(b_mix2))
 ATE_SD_Mix_boost<-sqrt(var(b_mix2_boost))
-ATE_SD_Mix_forest<-sqrt(var(b_mix2_forest))
+# ATE_SD_Mix_forest<-sqrt(var(b_mix2_forest))
 
-xtable(rbind(c(ATE_ipw_bl,ATE_DR,ATE_mix,ATE_mix_boost),
+table = xtable(rbind(c(ATE_ipw_bl,ATE_DR,ATE_mix,ATE_mix_boost),
 c(ATE_SD_IPW,ATE_SD_DR,ATE_SD_Mix,ATE_SD_Mix_boost),
 c(ATT_ipw_bl,ATT_DR,ATT_mix,ATT_mix_boost),
 c(ATT_SD_IPW,ATT_SD_DR,ATT_SD_Mix,ATT_SD_Mix_boost)),digits=4)
 
+# Get only those that worked
+ATT_SD_IPW<-ATT_SD_IPW[ATT_SD_IPW != 0]
+ATT_SD_DR<-ATT_SD_IPW[ATT_SD_IPW != 0]
+ATT_SD_Mix<-ATT_SD_IPW[ATT_SD_IPW != 0]
+ATT_SD_Mix_boost<-ATT_SD_IPW[ATT_SD_IPW != 0]
+
+ATT = c(ATT_ipw_bl,ATT_DR,ATT_mix,ATT_mix_boost) %>%unlist()
+ATT_SD = c(ATT_SD_IPW,ATT_SD_DR,ATT_SD_Mix,ATT_SD_Mix_boost) %>%unlist()
+AOT = debit %>% filter(debit_card1998 == 1) %>% dplyr::select(spending1998) %>% summarize(mean = mean(spending1998))
+AOT_over_AOT = ATT / AOT %>% unlist %>%as.numeric()
 
 #pdf("Residual_check.pdf",height=5,width=10)
 #par(mfrow=c(1,2))
@@ -757,7 +775,6 @@ c(ATT_SD_IPW,ATT_SD_DR,ATT_SD_Mix,ATT_SD_Mix_boost)),digits=4)
 ```
 
 ## Conclusions
-
 ![](xtable.png)
 
 
