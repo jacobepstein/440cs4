@@ -579,6 +579,7 @@ Moving forward with 1:1 matching, we see that the absolute mean differences are 
 We attempt to fit models on top of the 1:1 matching with replacement. We first use a basic linear model before fitting more flexible models, random forest and extreme gradient boosting.
 
 ```{r}
+#Model set-up
 outcome_formula = function()
 {
   return(spending1998 ~ spending1995 + num_of_earners + average_age + family_size + geograph_area + num_of_inhabitants + householder_age + householder_education + num_of_banks + interest_rate + income + wealth + cash_inventory)
