@@ -614,10 +614,30 @@ mu5=predict(model_treat_boost,newdata=data.matrix(control_X),type="response")
 mu6=predict(model_treat_boost,newdata=data.matrix(treat_X),type="response")
 ATE_mix_boost=ATE_matching_1$est-(-sum(mu3)+sum(mu4)-sum(mu5)+sum(mu6))/(6*dim(olp.debit)[1])
 
+
+#Random Forest
+
+model_control_forest <- randomForest(spending1998 ~ spending1995 + num_of_earners + average_age + family_size + geograph_area +  num_of_inhabitants + householder_age + householder_education + num_of_banks + interest_rate + income + wealth + cash_inventory, data = controls)
+
+model_treat_forest <- randomForest(spending1998 ~ spending1995 + num_of_earners + average_age + family_size + geograph_area +  num_of_inhabitants + householder_age + householder_education + num_of_banks + interest_rate + income + wealth + cash_inventory, data = treats)
+
+#ATT
+mu1=predict(model_control_forest,newdata=control_X,type="response")
+mu2=predict(model_control_forest,newdata=treat_X,type="response")
+
+ATT_mix_forest=mean(olp.debit %>% filter(debit_card1998 == 1) %>% dplyr::select(spending1998) %>% unlist())-sum(olp.debit[ATT_matching_1$index.control,"spending1998"]+mu2-mu1)/(6*treat_size1)
+
+#ATE
+mu3=predict(model_control_forest,newdata=control_X,type="response")
+mu4=predict(model_control_forest,newdata=treat_X,type="response")
+mu5=predict(model_treat_forest,newdata=control_X,type="response")
+mu6=predict(model_treat_forest,newdata=treat_X,type="response")
+ATE_mix_forest=ATE_matching_1$est-(-sum(mu3)+sum(mu4)-sum(mu5)+sum(mu6))/(6*dim(olp.debit)[1])
+
 data.frame(ATT_mix,
       ATE_mix,
       ATT_mix_boost, 
-      ATE_mix_boost)
+      ATE_mix_boost, ATT_mix_forest, ATE_mix_forest)
 
 #Regression Adjustment with Splines (the "gam" function in the "mgcv" package)   
 controls=controls %>% mutate_if(is.character, as.factor)
@@ -625,11 +645,17 @@ treats=treats %>% mutate_if(is.character, as.factor)
 
 # outcomeformula_gam = function()
 # {
-#   return(spending1998 ~ s(spending1995) + s(num_of_earners) + average_age + s(family_size) + geograph_area + num_of_inhabitants + householder_age + s(householder_education) + s(num_of_banks) + s(interest_rate) + s(income) + s(wealth) + s(cash_inventory))
+#   return(spending1998 ~ spending1995 + num_of_earners + average_age + family_size + geograph_area + num_of_inhabitants + householder_age + householder_education + num_of_banks + interest_rate + income + wealth + cash_inventory)
 # }
-
+# 
+# 
 # model_control_gam <- mgcv::gam(formula = outcomeformula_gam(), data = controls)
 # model_control_gam <- mgcv::gam(formula = outcomeformula_gam(), data = treats)
+# 
+# #ATT
+# mu1=predict(model_control_boost,newdata=data.matrix(control_X),type="response")
+# mu2=predict(model_control_boost,newdata=data.matrix(treat_X),type="response")
+# 
 # mu3=predict(model_control_gam,newdata=data.matrix(control_X),type="response")
 # mu4=predict(model_control_gam,newdata=data.matrix(treat_X),type="response")
 # mu3=predict(model_treat_gam,newdata=data.matrix(control_X),type="response")
