@@ -236,6 +236,8 @@ We then examined relationships between demographic characteristics and 1998 spen
 We move forward with attempts to balance the covariates(matching, weighting, propensity scores) as these plots illustrate significant differences in the covariates between the spending1998 and control groups. 
 
 ```{r}
+#extra eda
+
 ###pct of income, no different than above
 # 
 # ggplot(debit %>% filter(income > 3000), aes(y = spend98_pct_income, x = debit_card1998, fill = debit_card1998)) +
@@ -576,15 +578,13 @@ Moving forward with 1:1 matching, we see that the absolute mean differences are 
 
 We attempt to fit models on top of the 1:1 matching with replacement. We first use a basic linear model before fitting more flexible models, random forest and extreme gradient boosting.
 
-```{r, eval = FALSE}
-#delete eval=FALSE^
+```{r}
 outcome_formula = function()
 {
   return(spending1998 ~ spending1995 + num_of_earners + average_age + family_size + geograph_area + num_of_inhabitants + householder_age + householder_education + num_of_banks + interest_rate + income + wealth + cash_inventory)
 }
 
 controls = olp.debit[ATT_matching_1$index.control, ]
-control_X = controls[,-c(1,2,16:21)]
 control_Y = controls$spending1998
 
 treats = olp.debit[ATT_matching_1$index.treated, ] %>% filter(num_of_earners != 5) %>% filter(family_size != 6)
