@@ -487,7 +487,7 @@ ggplot(data = ori.match3.df, aes(y = rownames(ori.match1.df))) + geom_point(aes(
 
 ![](ASD_compare.png)
 
-Moving forward with 1:1 matching, we see that the absolute mean differences are improved significantly across almost all covariates.
+Moving forward with 1:1 matching, we see that the absolute standardised differences are improved significantly across almost all covariates.
 
 ## Regression Adjustment
 
