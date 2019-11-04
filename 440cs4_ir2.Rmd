@@ -528,7 +528,12 @@ olp_sd1<-apply(data.matrix(olp.debit[,-c(1,2,16:21)]),MARGIN=2,FUN=function(x)
 
 match_asd_1<-match_d_1/olp_sd1
 
-loveplot(olp.debit[,-c(1,2,16:21)],ATE_matching_1$index.treated, ATT_matching_1$index.control, .1)
+ori.df = as.data.frame(ori_asd)
+match.df1 = as.data.frame(match_asd_1)
+ori.match1.df = cbind(ori.df, match.df1)
+
+ggplot(data = ori.match1.df, aes(y = rownames(ori.match1.df))) + geom_point(aes(x = match_asd_1, colour = "matched")) + geom_point(aes(x = ori_asd, colour = "original")) + xlab("Absolute Standardized Difference") +ylab("Covariate")
+
 
 #1:3
 
@@ -553,6 +558,12 @@ match_asd_3<-match_d_3/olp_sd3
 pdf("asd_compare.pdf",width=8,height=6)
 boxplot(ori_asd, match_asd_1, match_asd_3, weight_bl_asd, weight_rf_asd, weight_CART_asd, main="ASD for Different Methods",names=c("original", "1:1M", "1:3M", "Logistic Wt","RF Wt","CART Wt"),ylab="Abs Standardized Difference")
 dev.off()
+
+ori.df = as.data.frame(ori_asd)
+match.df3 = as.data.frame(match_asd_3)
+ori.match3.df = cbind(ori.df, match.df3)
+
+ggplot(data = ori.match3.df, aes(y = rownames(ori.match1.df))) + geom_point(aes(x = match_asd_1, colour = "matched")) + geom_point(aes(x = ori_asd, colour = "original")) + xlab("Absolute Standardized Difference") +ylab("Covariate")
 
 
 #Double Robustness
