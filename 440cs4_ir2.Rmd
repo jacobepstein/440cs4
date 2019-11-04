@@ -572,7 +572,7 @@ We calculate propensity scores using general logistic regression. We then exclud
 
 ![](ASD_compare.png)
 
-Moving forward with 1:1 matching, we see that the absolute mean differences are improved significantly across almost all covariates.
+Moving forward with 1:1 matching, we see that the absolute standardised differences are improved significantly across almost all covariates.
 
 ## Regression Adjustment
 
