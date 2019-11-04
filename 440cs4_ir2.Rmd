@@ -23,6 +23,7 @@ library(xtable)
 library(xgboost)
 library(randomForest)
 library(twang)
+
 ```
 
 ```{r}
@@ -184,7 +185,7 @@ spend_inhab = ggplot(debit, aes(y = spending1998, x = num_of_inhabitants, fill =
   theme_minimal() +
   labs(y = "1998 Spending", x = "Number of Inhabitants")
 
-# spend_inhab # ubran spend more
+# spend_inhab # urban spend more
 
 # ggplot(debit %>% filter(wealth < 1e6), aes(y = wealth, x = householder_education, fill = householder_education)) +
 #   geom_boxplot(width = .1, show.legend = FALSE) +
@@ -229,10 +230,11 @@ spend_banks = ggplot(debit %>% filter(num_of_banks < 500), aes(y = spending1998,
 
 
 grid.arrange(arrangeGrob(spend_edu, spend_fam_size, ncol = 1), spend_wealth, nrow = 1)
-
 ```
 
 We then examined relationships between demographic characteristics and 1998 spending. Some selected plots are shown above. Our initial analysis indicates that family size is positively associated with spending, which is intuitive given the cost of raising children. Additionally, families with household heads who have higher educational status tend to spend more than those headed by less educated individuals. This may be a function of income or wealth, as higher educated individuals tend to earn more; regardless, it is worth exploring further. Finally, both income and wealth are positively associated with spending, and households with debit cards tend to spend more at all levels of income and wealth. 
+
+We move forward with attempts to balance the covariates(matching, weighting, propensity scores) as these plots illustrate significant differences in the covariates between the spending1998 and control groups. 
 
 ```{r}
 ###pct of income, no different than above
@@ -526,6 +528,8 @@ olp_sd1<-apply(data.matrix(olp.debit[,-c(1,2,16:21)]),MARGIN=2,FUN=function(x)
 
 match_asd_1<-match_d_1/olp_sd1
 
+loveplot(olp.debit[,-c(1,2,16:21)],ATE_matching_1$index.treated, ATT_matching_1$index.control, .1)
+
 #1:3
 
 ATE_matching_3<-Match(Y=olp.debit$spending1998,Tr=olp.debit$debit_card1998,estimand = "ATE",
@@ -549,6 +553,18 @@ match_asd_3<-match_d_3/olp_sd3
 pdf("asd_compare.pdf",width=8,height=6)
 boxplot(ori_asd, match_asd_1, match_asd_3, weight_bl_asd, weight_rf_asd, weight_CART_asd, main="ASD for Different Methods",names=c("original", "1:1M", "1:3M", "Logistic Wt","RF Wt","CART Wt"),ylab="Abs Standardized Difference")
 dev.off()
+
+
+#Double Robustness
+#ATT DR
+ATT_DR<-mean(olp.debit["spending1998","debit_card1998"])-sum((olp.debit$debit_card1998*(1-olp.debit$spending1998)*
+                                  olp.debit$ps+predict(model_control,newdata=olp.debit,type="response")*
+                                               (olp.debit$spending1998-olp.debit$ps))/(1-olp.debit$ps))/treat_size
+#ATE DR
+ATE_DR<-mean(olp.debit$spending1998*olp.debit$debit_card1998/olp.debit$ps_basicLog)-
+    mean((olp.debit$spending1998-olp.debit$ps_basicLog)*predict(model_treated,newdata=olp.debit,type="response")/olp.debit$ps_basicLog)-
+    mean((1-olp.debit$spending1998)*olp.debit$debit_card1998/(1-olp.debit$ps_basicLog))-
+    mean((olp.debit$spending1998-olp.debit$ps_basicLog)*predict(model_control,newdata=olp.debit,type="response")/(1-olp.debit$ps_basicLog))
 ```
 ![](overlap_check.png)
 
@@ -556,11 +572,11 @@ We calculate propensity scores using general logistic regression. We then exclud
 
 ![](ASD_compare.png)
 
-Moving forward with weighting, we see that the absolute mean differences are improved significantly across almost all covariates.
+Moving forward with 1:1 matching, we see that the absolute mean differences are improved significantly across almost all covariates.
 
-## Model Selection
+## Regression Adjustment
 
-We considered two models to find the debit_card1998 effect of debit card on spending: a simple linear model as well as a more flexible XGBoost Model. Both models yield very similar results, and their outputs are shown below. Since the linear model is more interpretable, we will report our conclusions using the results from this model. However, further exploration should be done to determine whether a more flexibe model, such as Xgboost might in general yield more accurate results.
+We attempt to fit models on top of the 1:1 matching with replacement. We first use a basic linear model before fitting more flexible models, random forest and extreme gradient boosting.
 
 ```{r, eval = FALSE}
 #delete eval=FALSE^
