@@ -672,7 +672,7 @@ ATE_DR <-mean(olp.debit$debit_card1998*olp.debit$spending1998/olp.debit$ps_basic
 ```{r}
 #Bootstrap to Get the Variance
 
-B=200
+B=500
 b_IPW1<-b_IPW2<-numeric(B)
 b_DR1<-b_DR2<-b_mix1<-b_mix2<-b_mix1_boost<-b_mix2_boost<-b_mix1_forest<-b_mix2_forest<-numeric(B)
 for (i in (1:B))
@@ -841,7 +841,7 @@ c(ATT_SD_IPW,ATT_SD_DR,ATT_SD_Mix,ATT_SD_Mix_boost)),digits=4)
 ```
 
 ## Conclusions
-![](outputtable.png)
+![](xtable.png)
 
 
 From our model, we can conclude that having a debit card caused the Italian households with debit cards to increase their spending by about $460 per month. 
