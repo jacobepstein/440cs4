@@ -592,6 +592,7 @@ treats = olp.debit[ATT_matching_1$index.treated, ] %>% filter(num_of_earners != 
 treat_X = treats[,-c(1,2,16:21)]
 treat_Y = treats$spending1998
 
+
 #Regression Adjustment with Linear Model
 
 #Models
