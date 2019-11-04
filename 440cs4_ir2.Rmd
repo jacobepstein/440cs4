@@ -591,7 +591,9 @@ treats = olp.debit[ATT_matching_1$index.treated, ] %>% filter(num_of_earners != 
 treat_X = treats[,-c(1,2,16:21)]
 treat_Y = treats$spending1998
 
-#Linear Model
+#Regression Adjustment with Linear Model
+
+#Models
 model_control <- lm(outcome_formula(), data = controls)
 model_treated <- lm(outcome_formula(), data = treats)
 
@@ -610,6 +612,8 @@ ATE_mix = ATE_matching_1$est - (-sum(mu3) + sum(mu4) - sum(mu5) + sum(mu6))/(dim
 
 
 #Regression Adjustment with XGBoost
+
+#Models
 model_control_boost <- xgboost(data=data.matrix(control_X), label = data.matrix(control_Y), nrounds = 30, verbose = 0)
 model_treat_boost <- xgboost(data=data.matrix(treat_X), label = data.matrix(treat_Y), nrounds = 30, verbose = 0)
 
@@ -627,7 +631,9 @@ mu6=predict(model_treat_boost,newdata=data.matrix(treat_X),type="response")
 ATE_mix_boost=ATE_matching_1$est-(-sum(mu3)+sum(mu4)-sum(mu5)+sum(mu6))/(dim(olp.debit)[1])
 
 
-#Random Forest
+#Regression Adjustment with Random Forest
+
+#Models
 model_control_forest <- randomForest(spending1998 ~ spending1995 + num_of_earners + average_age + family_size + geograph_area +  num_of_inhabitants + householder_age + householder_education + num_of_banks + interest_rate + income + wealth + cash_inventory, data = controls)
 
 model_treat_forest <- randomForest(spending1998 ~ spending1995 + num_of_earners + average_age + family_size + geograph_area +  num_of_inhabitants + householder_age + householder_education + num_of_banks + interest_rate + income + wealth + cash_inventory, data = treats)
