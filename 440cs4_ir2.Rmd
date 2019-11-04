@@ -23,7 +23,6 @@ library(xtable)
 library(xgboost)
 library(randomForest)
 library(twang)
-
 ```
 
 ```{r}
