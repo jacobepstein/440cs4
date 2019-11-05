@@ -1,7 +1,7 @@
 ---
-title: "Case Study IV, Interim Report II"
+title: "Case Study IV Final Report"
 author: "Jake Epstein, Daniel Spottiswood, Man-Lin Hsiao, Michael Tan, Sahil Patel"
-date: "11/01/2019"
+date: "11/05/2019"
 output:
   pdf_document: default
   html_document: default
@@ -513,15 +513,15 @@ ggplot(data = ori.match3.df, aes(y = rownames(ori.match1.df))) + geom_point(aes(
 
 [TODO: Discussion of why we're choosing 1:1 matching for regression adjustment]
 
+[TODO: Discussion of wthe implicit assumptions of our study]
+
 ![](ASD_compare.png)
 
 Moving forward with 1:1 matching, we see that the absolute standardised differences are improved significantly across almost all covariates.
 
-## Model Selection
+## Regression Adjustment
 
 We attempt to fit models on top of the 1:1 matching with replacement. We first use a basic linear model before fitting more flexible models, random forest and extreme gradient boosting.
-
-### Regression Adjustment
 
 ```{r}
 #Model set-up
@@ -631,8 +631,8 @@ reg_adj_results=data.frame(
   "quantity" = rep(c("ATT", "ATE"), 4) %>% unlist(),
   "model"=c("Unmatched Linear","Unmatched Linear",
            "Matched Linear","Matched Linear",
-           "Boosted","Boosted",
-           "Forest","Forest"),
+           "Extreme Gradient Boosting","Extreme Gradient Boosting",
+           "Random Forest","Random Forest"),
   "vals"=c(ATT_lin_reg, ATE_lin_reg,
     ATT_mix, ATE_mix,
     ATT_mix_boost, ATE_mix_boost, 
@@ -640,7 +640,7 @@ reg_adj_results=data.frame(
 
 ggplot(reg_adj_results,aes(x = model, y = vals, fill = quantity))+
   geom_col(position = "dodge")+
-  labs(title="ATT and ATE for all Models Explored", x = "Model", y = "Change in Monthly Household Spending ($)", fill = "Quantity")+
+  labs(title="ATT and ATE for Regression Adjustment", x = "Model", y = "Change in Monthly Household Spending ($)", fill = "Quantity")+
   theme_minimal() +
   coord_flip()
 ```
@@ -648,20 +648,18 @@ ggplot(reg_adj_results,aes(x = model, y = vals, fill = quantity))+
 The motivation for regression adjustment is to impute missing potential outcomes by fitting models to the unobserved counterparts of subsets of the observed data. We have elected to include a regression adjustment in addition to our propensity score matching as it allows us to mitigate the sensitivity of our models to the model specification used to impute these unobserved values.
 </br>
 
-As described above, our 1:1 matched data has demonstrated the most compelling distribution of absolute standardised difference and therefore yields the strongest results for the overlap of data through a propensity score methodology. Conequently, we partitioned the data into treatment and control groups through the 1:1 mathcing method, and then imputed unobserved control values for the observed treatment values, and vice versa for the observed control values.
+As described above, our 1:1 matched data has demonstrated the most compelling distribution of absolute standardised differences and therefore yields the strongest results for the overlap of data through a propensity score methodology. Consequently, we partitioned the data into treatment and control groups through the 1:1 matching method, and then imputed unobserved control values for the observed treatment values, and vice versa for the observed control values.
 </br>
 
-We began testing our models by running a simple linear (OLS) model on the original unmatched dataset. The results of this test proved unfruitful as the ATT for this model was lower than the corresponding ATE. This suggests that the effect of individuals who were observed to own debit cards in 1998 spent on average 185 more than those who did not. Furthermore, the unmatched model suggests that after imputing control values for those who did own a debit card in 1998, that the implied treatment effect increased to 218 in spending. Ergo, the model implies that those who recieved the treatment would have spent less than those in the corresponding observed control group should they have never recieved the treatment. Intutively, this reinforces our intuition to use the matched data as it would allow our model to account for unoberserved confounders better, and therefore allow for stronger causal inference
+We began testing our models by running a simple linear (OLS) model on the original unmatched dataset. We expect this method to have high bias due to the imbalance of the covariates in the initial dataset. This model suggested that the effect of individuals who were observed to own debit cards in 1998 spent on average 185 more than those who did not. Furthermore, the unmatched model suggests that after imputing control values for those who did own a debit card in 1998, that the implied treatment effect increased to 218 in spending. 
 </br>
-
-As illustrated by the table above, the ATT is higher than the ATE across all models that were built with the 1:1 matched data. This suggests that matching enabled us to obviate a case of Simpson's Paradox as the unmatched model demonstrated the opposite intuition.
+We then performed regression adjustment on top of the matched data set in order to reduce sensitivity caused by an imbalance of the covariates across groups. By coupling this with flexible models, we have utilized both design and anlaysis based approaches to reducing model sensitivity.
 </br>
-
-In terms of the flexibility of our models, the machine learning models (the gradient boost and random forest) are intrinsically more flexible than our OLS model as they learn from previous errors in order to fine tune their ability to predict. That being said, it somewhat cumbersome to ascertain which of our machine learning models is in fact more flexible mathematically. The forest is useful as it is easier to fit as it only depends on the number of trees and the number of factors selected (the boosted model depends on more features); in addition, the forest does not overfit the data as much as the boosted model. Nevertheless, the boosted model is also compelling as it is capable of optimising a broader selection of objective function than the forest, and typically leads to more accuracy with fewer trees (the forest tends to prefer smaller trees leading to lesser accuracy in some cases). The complexity of the data at hand has led us to prefer our boosted model, which yielded the highest ATT (286) and ATE (169).
+In terms of the flexibility of our three models, the machine learning models (the gradient boost and random forest) are intrinsically more flexible than our OLS model as they learn from previous errors in order to fine tune their ability to predict and are just a collection of weak classifiers. That being said, it somewhat cumbersome to ascertain which of our machine learning models is in fact more flexible mathematically. The forest is useful as it is easier to fit as it only depends on the number of trees and the number of factors selected (the boosted model depends on more features); in addition, the forest does not overfit the data as much as the boosted model. Nevertheless, the boosted model is also compelling as it is capable of optimising a broader selection of objective function than the forest, and typically leads to more accuracy with fewer trees (the forest tends to prefer smaller trees leading to lesser accuracy in some cases). The complexity of the data at hand has led us to prefer our extreme gradient boosting model; however, either would be reasonable choices in this scenario and lead to similar conclusions.
 </br>
 
 ### Bootstrapping
-In order to estimate the error and significance of our models for ATT and ATE, we generated 500 bootstrap samples of the data. Using these bootstrap samples, we recalculated the propensity scores and estimated the resulting causal effects for each dataset accordingly. In our bootstrapping process, we evaluated both the ATT and ATE for weighting, weighting with double robustness, 1:1 matching with our linear model, and 1:1 matching with our gradient boosted model.
+In order to estimate the error and significance of our models for ATT and ATE, we generated 500 bootstrap samples of the data. Using these bootstrap samples, we recalculated the propensity scores and estimated the resulting causal effects for each dataset accordingly. In our bootstrapping process, we evaluated both the ATT and ATE for weighting, weighting with double robustness, regression adjustment with a linear model, 1:1 matching with a linear regression adjustment, and 1:1 matching with a gradient boosted regression adjustment.
 
 ```{r}
 #Double Robustness
@@ -877,12 +875,15 @@ c(ATT_SD_lin_reg, ATT_SD_IPW,ATT_SD_DR,ATT_SD_Mix,ATT_SD_Mix_boost), ATT_over_AO
 ![](xtable.png)
 
 
-The results of bootstrapping support our aforementioned belief in the gradient boosted model. As portrayed in the table above, the boosted model was the most significant (as estimated by the model's p-value) and had the lowest estimated standard deviation (via bootstrapping) for ATE across all models explored. Interestingly, the boosted model did have the highest bootstrap estimate for ATE standard deviation, however given the desirability of the model's other metrics and the flexibility of the model holistically, we continue to endorse the gradient boosted model as our model of choice.
+The results of bootstrapping support our aforementioned belief in the gradient boosted model. As portrayed in the table above, the boosted model showed significant (as estimated by the model's p-value) impact of the treatment and had the lowest estimated standard deviation (via bootstrapping) for ATE across all models explored. Interestingly, the boosted model did have the highest bootstrap estimate for ATE standard deviation, however given the desirability of the model's other metrics and the flexibility of the model holistically, we continue to endorse the gradient boosted model. This is not meant discredit any of the other methods as it is very promising to see the consistency and significance across several different methods.
 
 </br>
 
 ## Conclusions
 
-Overall, our investigation into the effects of debit card ownership on spending has demonstrated that there is in fact a positive treatment effect associated with owning a debit card in 1998. While it may prove difficult to extrapolate the results of this study to other geographies and time periods (for example), we believe that through implementing 1:1 matching and regression adjustments with flexible machine learning models, like gradient boosting, we have achieved the ability to draw some causal inference. Namely, we estimate the ATT to be approximately 286 and the ATE to be approximately 169.
+Overall, our investigation into the effects of debit card ownership on spending has demonstrated that there is in fact a positive treatment effect associated with owning a debit card in 1998. While it may prove difficult to extrapolate the results of this study to other geographies and time periods (for example), we believe that through implementing 1:1 matching and regression adjustments with flexible machine learning models, like gradient boosting, we have achieved the ability to draw causal inference. We see that that the methods suggest the increase in monthly consumption for a household with a debit card ranges from 8.3% to 14.1% and 169 to 286, with each of these models showing definitively that there is a statistically significant increase. The AOT, average outcome for the treated, is approximately 2028 in this dataset. 
+</br>
+
+These results support psychological research in this area and our general intuition that debit cards reduce the emotional connection to money causing us to be more willing to spend. We hope that further research continues to explore this connection as technology continues to make it easier and more efficient to transfer, spend, and earn money. It is important for us to understand the psychological impact that digital assets have on our spending/saving habits.
 
 
