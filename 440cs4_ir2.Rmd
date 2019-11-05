@@ -811,6 +811,8 @@ c(ATE_SD_lin_reg, ATE_SD_IPW,ATE_SD_DR,ATE_SD_Mix,ATE_SD_Mix_boost),
 c(ATT_lin_reg, ATT_ipw_bl,ATT_DR,ATT_mix,ATT_mix_boost),
 c(ATT_SD_lin_reg, ATT_SD_IPW,ATT_SD_DR,ATT_SD_Mix,ATT_SD_Mix_boost), ATT_over_AOT, p_value),digits=6)
 
+table
+
 #pdf("Residual_check.pdf",height=5,width=10)
 #par(mfrow=c(1,2))
 #plot(fitted(model_treated),residuals.gam(model_treated),ylab="residual",xlab="fitted value (Control Model)")
