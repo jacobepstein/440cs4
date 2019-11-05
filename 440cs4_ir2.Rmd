@@ -500,6 +500,24 @@ outcome_formula = function()
   return(spending1998 ~ spending1995 + num_of_earners + average_age + family_size + geograph_area + num_of_inhabitants + householder_age + householder_education + num_of_banks + interest_rate + income + wealth + cash_inventory)
 }
 
+#Regression Adjustment with Linear Model before matching
+controls = debit %>% filter(debit_card1998 == 0)
+treats = debit %>% filter(debit_card1998 == 1)
+#Models
+model_control <- glm(outcome_formula(), data = debit %>% filter(debit_card1998 == 0))
+model_treated <- glm(outcome_formula(), data = debit %>% filter(debit_card1998 == 1))
+
+#ATT
+mu1 = predict(model_control, newdata=debit %>% filter(debit_card1998 == 1), type = "response") 
+
+ATT_lin_reg <- mean(treats$spending1998-mu1)
+
+ATE_lin_reg<-(sum(treats$spending1998-predict(model_control,newdata = treats,type="response"))-
+  sum(controls$spending1998-predict(model_treated,newdata = controls,type="response")))/dim(debit)[1]
+
+
+# Use 1:1 Matching moving forward
+
 controls = olp.debit[ATT_matching_1$index.control, ]
 control_X = controls[, -c(1,2,16:21)]
 control_Y = controls$spending1998
@@ -509,7 +527,7 @@ treat_X = treats[,-c(1,2,16:21)]
 treat_Y = treats$spending1998
 
 
-#Regression Adjustment with Linear Model
+#Regression Adjustment with Linear Model on top of 1:1 matching
 
 #Models
 model_control <- lm(outcome_formula(), data = controls)
@@ -597,7 +615,7 @@ ATE_DR <-mean(olp.debit$debit_card1998*olp.debit$spending1998/olp.debit$ps_basic
 #Bootstrap to Get the Variance
 
 B=500
-b_IPW1<-b_IPW2<-numeric(B)
+b_IPW1<-b_IPW2<-b_ATT_lin_reg<-b_ATE_lin_reg<-numeric(B)
 b_DR1<-b_DR2<-b_mix1<-b_mix2<-b_mix1_boost<-b_mix2_boost<-b_mix1_forest<-b_mix2_forest<-numeric(B)
 for (i in (1:B))
 {
@@ -639,6 +657,21 @@ for (i in (1:B))
       control<-b_ATT_matching_m$index.control
       treat_size<-length(treated)
       control_size<-dim(bdata)[1]-treat_size
+      
+      #Regression Adjustment with Linear Model before matching
+      controls = bdata %>% filter(debit_card1998 == 0)
+      treats = bdata %>% filter(debit_card1998 == 1)
+      #Models
+      model_control <- glm(outcome_formula(), data = debit %>% filter(debit_card1998 == 0))
+      model_treated <- glm(outcome_formula(), data = debit %>% filter(debit_card1998 == 1))
+
+      #ATT
+      mu1 = predict(model_control, newdata=debit %>% filter(debit_card1998 == 1), type = "response") 
+      
+      b_ATT_lin_reg[i] <- mean(treats$spending1998-mu1)
+      
+      b_ATE_lin_reg[i]<-(sum(treats$spending1998-predict(model_control,newdata = treats,type="response"))-
+        sum(controls$spending1998-predict(model_treated,newdata = controls,type="response")))/dim(bdata)[1]
       
       #ATT: Matching with regression
       b_control <- lm(outcome_formula(), data = bdata[control,])
@@ -739,33 +772,34 @@ for (i in (1:B))
 }
 
 #Calculate Bootstrap Variance and SD
+ATT_SD_lin_reg<-sqrt(var(b_ATT_lin_reg))
 ATT_SD_IPW<-sqrt(var(b_IPW1))
 ATT_SD_DR<-sqrt(var(b_DR1))
 ATT_SD_Mix<-sqrt(var(b_mix1))
 ATT_SD_Mix_boost<-sqrt(var(b_mix1_boost))
 # ATT_SD_Mix_forest<-sqrt(var(b_mix1_forest))
 
+ATE_SD_lin_reg<-sqrt(var(b_ATE_lin_reg))
 ATE_SD_IPW<-sqrt(var(b_IPW2))
 ATE_SD_DR<-sqrt(var(b_DR2))
 ATE_SD_Mix<-sqrt(var(b_mix2))
 ATE_SD_Mix_boost<-sqrt(var(b_mix2_boost))
 # ATE_SD_Mix_forest<-sqrt(var(b_mix2_forest))
 
-table = xtable(rbind(c(ATE_ipw_bl,ATE_DR,ATE_mix,ATE_mix_boost),
-c(ATE_SD_IPW,ATE_SD_DR,ATE_SD_Mix,ATE_SD_Mix_boost),
-c(ATT_ipw_bl,ATT_DR,ATT_mix,ATT_mix_boost),
-c(ATT_SD_IPW,ATT_SD_DR,ATT_SD_Mix,ATT_SD_Mix_boost)),digits=4)
 
-# Get only those that worked
-ATT_SD_IPW<-ATT_SD_IPW[ATT_SD_IPW != 0]
-ATT_SD_DR<-ATT_SD_IPW[ATT_SD_IPW != 0]
-ATT_SD_Mix<-ATT_SD_IPW[ATT_SD_IPW != 0]
-ATT_SD_Mix_boost<-ATT_SD_IPW[ATT_SD_IPW != 0]
-
-ATT = c(ATT_ipw_bl,ATT_DR,ATT_mix,ATT_mix_boost) %>%unlist()
-ATT_SD = c(ATT_SD_IPW,ATT_SD_DR,ATT_SD_Mix,ATT_SD_Mix_boost) %>%unlist()
+ATT = c(ATT_lin_reg, ATT_ipw_bl,ATT_DR,ATT_mix,ATT_mix_boost) %>%unlist()
+ATT_SD = c(ATT_SD_lin_reg, ATT_SD_IPW,ATT_SD_DR,ATT_SD_Mix,ATT_SD_Mix_boost) %>%unlist()
 AOT = debit %>% filter(debit_card1998 == 1) %>% dplyr::select(spending1998) %>% summarize(mean = mean(spending1998))
-AOT_over_AOT = ATT / AOT %>% unlist %>%as.numeric()
+ATT_over_AOT = ATT / AOT %>% unlist %>%as.numeric()
+
+z_score = ATT/ATT_SD 
+
+p_value = pnorm(-z_score)
+
+table = xtable(rbind(c(ATE_lin_reg,ATE_ipw_bl,ATE_DR,ATE_mix,ATE_mix_boost),
+c(ATE_SD_lin_reg, ATE_SD_IPW,ATE_SD_DR,ATE_SD_Mix,ATE_SD_Mix_boost),
+c(ATT_lin_reg, ATT_ipw_bl,ATT_DR,ATT_mix,ATT_mix_boost),
+c(ATT_SD_lin_reg, ATT_SD_IPW,ATT_SD_DR,ATT_SD_Mix,ATT_SD_Mix_boost), ATT_over_AOT, p_value),digits=6)
 
 #pdf("Residual_check.pdf",height=5,width=10)
 #par(mfrow=c(1,2))
@@ -776,6 +810,5 @@ AOT_over_AOT = ATT / AOT %>% unlist %>%as.numeric()
 
 ## Conclusions
 ![](xtable.png)
-
 
 [TODO: Add interpretations and conclusions of above table]
