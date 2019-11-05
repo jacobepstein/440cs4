@@ -162,7 +162,7 @@ spend_wealth = ggplot(debit, aes(y = spending1998, x = wealth, color = debit_car
   geom_point() +
   theme_minimal() +
   geom_smooth(method = "lm") +
-  labs(y = "1998 Spending", x = "Wealth", title = "Wealth vs. Spending")
+  labs(y = "1998 Spending", x = "Wealth", title = "Wealth vs. Spending", fill = "Debit Card?")
 
 spend_inc = ggplot(debit, aes(y = spending1998, x = income, color = debit_card1998))+
   geom_point() +
@@ -196,8 +196,7 @@ grid.arrange(arrangeGrob(spend_edu, spend_fam_size, ncol = 1), spend_wealth, nro
 
 We then examined relationships between demographic characteristics and 1998 spending. Some selected plots are shown above. Our initial analysis indicates that family size is positively associated with spending, which is intuitive given the cost of raising children. Additionally, families with household heads who have higher educational status tend to spend more than those headed by less educated individuals. This may be a function of income or wealth, as higher educated individuals tend to earn more; regardless, it is worth exploring further. Finally, both income and wealth are positively associated with spending, and households with debit cards tend to spend more at all levels of income and wealth. 
 
-We move forward with attempts to balance the covariates using matching, weighting and propensity scores as these plots illustrate significant differences in the covariates between the treatment and control groups. 
-y = "1998 Spending (% of Income)", x = "Geography")
+We move forward with attempts to balance the covariates using matching, weighting and propensity scores as these plots illustrate significant differences in the covariates between the treatment and control groups.
 
 
 ## Data Balancing
