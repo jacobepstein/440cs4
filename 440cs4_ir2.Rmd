@@ -606,11 +606,14 @@ We began testing our models by running a simple linear (OLS) model on the origin
 As illustrated by the table above, the ATT is higher than the ATE across all models that were built with the 1:1 matched data. Intutively, this suggests that matching enabled us to obviate a case of Simpson's Paradox as the unmatched model demonstrated the opposite intuition.
 <\br>
 In terms of the flexibility of our models, the machine learning models (the gradient boost and random forest) are intrinsically more flexible than our OLS model as they learn from previous errors by design. That being said, it somewhat cumbersome to ascertain which of our machine learning models is in fact more flexible. The forest is useful as it is easier to fit as it only depends on the number of trees and the number of factors selected; in addition, the forest does not overfit the data as much as the boosted model. Nevertheless, the boosted model is also compelling as it is capable of optimising a broader selection of objective function than the forest, and typically leads to more accuracy with fewer trees. The complexity of the data at hand has led us to prefer our boosted model, which yielded the highest ATT (286) and ATE (169).
+<\br>
+
+In order to measure XXX.
 
 ```{r}
 #Double Robustness
-#ATT DR
 
+#Model
 olp.debit_modelling <- olp.debit %>% filter(num_of_earners != 5) %>% filter(family_size != 6) %>% filter(family_size != 7)
 
 
@@ -819,9 +822,6 @@ table
 #plot(fitted(model_control),residuals.gam(model_control),ylab="residual",xlab="fitted value (Treated Model)")
 #dev.off()
 ```
-
-[TODO: Writeup bootstrapping]
-
 
 ## Conclusions
 ![](xtable.png)
