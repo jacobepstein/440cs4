@@ -826,4 +826,8 @@ table
 ## Conclusions
 ![](xtable.png)
 
-[TODO: Add interpretations and conclusions of above table]
+XXX
+<\br>
+Overall, our investigation into the effects of debit card ownership on spending has demonstrated that there is in fact a positive treatment effect associated with owning a debit card in 1998. While it may prove difficult to extrapolate the results of this study to other geographies and time periods, we believe that through implementing 1:1 matching and regression adjustments with flexible machine learning models we have achieved the ability to draw some causal inference. Namely, we estimate the ATT to be approximately 286 and the ATE to be approximately 169.
+
+
