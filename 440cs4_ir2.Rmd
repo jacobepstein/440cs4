@@ -374,7 +374,7 @@ In order to improve the covariate balance so that we can proceed with causal inf
 </br>
 We created loveplots to illustrate the difference in ASD across covariates before and after adjustment. In each case, applying a matching or weighting method decreases ASD significantly. Using .1, a commonly used threshold for ASD, as our benchmark for balance, we see that most of our covariates exhibit at least a satisfactory level of balance. 
 
-```{r, fig.height= 15, fig.width=12}
+```{r, fig.height= 12, fig.width=12}
 #loveplots
 library(MatchIt)
 m.out_1 <- matchit(debit_card1998 ~ spending1995 + num_of_earners + average_age + family_size + geograph_area +  num_of_inhabitants + householder_age + householder_education + num_of_banks + interest_rate + income + wealth + cash_inventory, data = debit, method = "nearest", 
