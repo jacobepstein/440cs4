@@ -826,7 +826,7 @@ table
 ## Conclusions
 ![](xtable.png)
 
-XXX
+The results of bootstrapping support our aforementioned belief in the gradient boosted model. As portrayed in the table above, the boosted model was the most significant (as estimated by the model's p-value) and has the lowest estimated (via bootstrapping) standard deviation for ATE across all models explored. Interestingly, the boosted model did have the highest bootstrap estimate for ATE standard deviation, however given the desirability of the model's other metrics and the flexibility of the model holistically, we continue to endorse the gradient boosted model as our model of choice.
 <\br>
 Overall, our investigation into the effects of debit card ownership on spending has demonstrated that there is in fact a positive treatment effect associated with owning a debit card in 1998. While it may prove difficult to extrapolate the results of this study to other geographies and time periods, we believe that through implementing 1:1 matching and regression adjustments with flexible machine learning models we have achieved the ability to draw some causal inference. Namely, we estimate the ATT to be approximately 286 and the ATE to be approximately 169.
 
