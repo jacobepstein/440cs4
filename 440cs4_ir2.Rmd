@@ -168,7 +168,7 @@ spend_inc = ggplot(debit, aes(y = spending1998, x = income, color = debit_card19
   geom_point() +
   theme_minimal() +
   geom_smooth(method = "lm") +
-  labs(y = "1998 Spending", x = "Income", title = "Income vs. Spending")
+  labs(y = "1998 Spending", x = "Income", title = "Income vs. Spending", fill = "Debit Card?")
 
 # spend_inc # same as wealth
 
@@ -204,8 +204,6 @@ We move forward with attempts to balance the covariates using matching, weightin
 To examine data balance between control and treatment groups, we looked at three different propensity score models: logistic regression, random forest, and CART, a decision-tree based machine learning model. The overlap in propensity scores for each model is shown below. Logistic regression and random forest show good overlap, whereas CART does not. Given that logistic and random forest perform similarly, and logistic regression is a simpler and more interpretable model, we will use the logistic regression model for propensity scores.
 
 ![](prophists.png)
-
-[TODO: Get rid of excess outputhistograms, etc]
 
 ```{r}
 debit = read_dta("data/debitcard199598.dta")
@@ -369,8 +367,9 @@ ATT_ipw_CART<-(olp.debit%>%filter(debit_card1998==TRUE)%>%summarise(mean=mean(sp
 ATE_ipw_CART<-sum(olp.debit%>%filter(debit_card1998==TRUE)%>%pull(spending1998)/olp.debit%>%filter(debit_card1998==TRUE)%>%pull(ps_basicLog))/sum(1/(olp.debit%>%filter(debit_card1998==TRUE)%>%pull(ps_CART)))-sum(olp.debit%>%filter(debit_card1998==FALSE)%>%pull(spending1998)/(1-olp.debit%>%filter(debit_card1998==FALSE)%>%pull(ps_CART)))/sum(1/(1-olp.debit%>%filter(debit_card1998==FALSE)%>%pull(ps_CART)))
 ```
 
-[TODO: Fix all loveplots, focus on matching]
-
+In order to improve the covariate balance so that we can proceed with causal inference, we performed matching and weighting methods on the data. Namely, we performed 1:1 matching with replacement, 1:3 matching with replacement, weighting with a basic logistic model (treatment ~ all the other covariates besides response), weighting with a random forest, and weighting with a classification and regression tree (CART). 
+</br>
+We also created loveplots to illustrate the difference in ASD across covariates before and after adjustment. In each case, applying a matching or weighting methods decreases ASD significantly.
 
 ```{r, fig.height= 15, fig.width=12}
 #loveplots
@@ -423,7 +422,16 @@ lp_CART = love.plot(debit.CART_weight,
 
 grid.arrange(lp_one_one, lp_one_three, lp_log, lp_rf, nrow = 2)
 ```
+</br>
 
+With weighting, we used propensity scores that resulted from the basic logistic model, random forest, and CART. We created overlapped histograms or density plots of the estimated propensity scores of treatment vs. control groups to provide good summaries of the balance of the covariates between groups. Then, we made sure to only conduct analysis on the overlapped regions, as causal inference is impossible in the non-overlapped regions. 
+
+<!-- To examine ATT, we used the following weights: for treated units, w_{i}=1; for control units, w_{i}=e(x_{i})/(1−e(x_{i})). We then estimated the causal effect by a weighted average of the outcomes in the treatment and control group:  -->
+<!-- \tau =\frac{\sum_{i:Z_{i}=1} w_{i}Z_{i}Y_{i} }{\sum_{i:Z_{i}=1} w_{i}Z_{i}} - \frac{\sum_{i:Z_{i}=0} w_{i}(1-Z_{i})Y_{i} }{\sum_{i:Z_{i}=0} w_{i}(1-Z_{i})} -->
+
+</br>
+
+In the end, the results were outputted in the following graphic. Given that 1:1 matching clearly yields the lowest ASD, we will proceed with that.
 
 ```{r}
 
@@ -517,11 +525,6 @@ ori.match3.df = cbind(ori.df, match.df3)
 
 #ggplot(data = ori.match3.df, aes(y = rownames(ori.match1.df))) + geom_point(aes(x = match_asd_1, colour = "matched")) + geom_point(aes(x = ori_asd, colour = "original")) + xlab("Absolute Standardized Difference") +ylab("Covariate")
 ```
-[TODO: Add lines, categorical variables to matching love plots]
-
-[TODO: Discussion of why we're choosing 1:1 matching for regression adjustment]
-
-[TODO: Discussion of wthe implicit assumptions of our study]
 
 ![](ASD_compare.png)
 
@@ -645,12 +648,6 @@ reg_adj_results=data.frame(
     ATT_mix, ATE_mix,
     ATT_mix_boost, ATE_mix_boost, 
     ATT_mix_forest, ATE_mix_forest))
-
-ggplot(reg_adj_results,aes(x = model, y = vals, fill = quantity))+
-  geom_col(position = "dodge")+
-  labs(title="ATT and ATE for Regression Adjustment", x = "Model", y = "Change in Monthly Household Spending ($)", fill = "Quantity")+
-  theme_minimal() +
-  coord_flip()
 ```
 
 The motivation for regression adjustment is to impute missing potential outcomes by fitting models to the unobserved counterparts of subsets of the observed data. We have elected to include a regression adjustment in addition to our propensity score matching as it allows us to mitigate the sensitivity of our models to the model specification used to impute these unobserved values.
@@ -661,9 +658,19 @@ As described above, our 1:1 matched data has demonstrated the most compelling di
 
 We began testing our models by running a simple linear (OLS) model on the original unmatched dataset. We expect this method to have high bias due to the imbalance of the covariates in the initial dataset. This model suggested that the effect of individuals who were observed to own debit cards in 1998 spent on average 185 more than those who did not. Furthermore, the unmatched model suggests that after imputing control values for those who did own a debit card in 1998, that the implied treatment effect increased to 218 in spending. 
 </br>
-We then performed regression adjustment on top of the matched data set in order to reduce sensitivity caused by an imbalance of the covariates across groups. By coupling this with flexible models, we have utilized both design and anlaysis based approaches to reducing model sensitivity.
+
+We then performed regression adjustment on top of the matched data set in order to reduce sensitivity caused by an imbalance of the covariates across groups. By coupling this with flexible models, we have utilized both design and anlaysis based approaches to reducing model sensitivity. The output from some of the models we tested is shown below.
 </br>
-In terms of the flexibility of our three models, the machine learning models (the gradient boost and random forest) are intrinsically more flexible than our OLS model as they learn from previous errors in order to fine tune their ability to predict and are just a collection of weak classifiers. That being said, it somewhat cumbersome to ascertain which of our machine learning models is in fact more flexible mathematically. The forest is useful as it is easier to fit as it only depends on the number of trees and the number of factors selected (the boosted model depends on more features); in addition, the forest does not overfit the data as much as the boosted model. Nevertheless, the boosted model is also compelling as it is capable of optimising a broader selection of objective function than the forest, and typically leads to more accuracy with fewer trees (the forest tends to prefer smaller trees leading to lesser accuracy in some cases). The complexity of the data at hand has led us to prefer our extreme gradient boosting model; however, either would be reasonable choices in this scenario and lead to similar conclusions.
+
+```{r, fig.width=7, fig.height=4}
+ggplot(reg_adj_results,aes(x = model, y = vals, fill = quantity))+
+  geom_col(position = "dodge")+
+  labs(title="ATT and ATE for Regression Adjustment", x = element_blank(), y = "Change in Monthly Household Spending ($)", fill = "Quantity")+
+  theme_minimal() +
+  coord_flip()
+```
+
+In terms of the flexibility of our three models, the machine learning models (the gradient boost and random forest) are intrinsically more flexible than our OLS model as they learn from previous errors in order to fine tune their ability to predict and are just a collection of weak classifiers. That being said, it somewhat cumbersome to ascertain which of our machine learning models is in fact more flexible mathematically. The forest is useful as it is easier to fit as it only depends on the number of trees and the number of factors selected (the boosted model depends on more features); in addition, the forest does not overfit the data as much as the boosted model. Nevertheless, the boosted model is also compelling as it is capable of optimising a broader selection of objective function than the forest, and typically leads to more accuracy with fewer trees (the forest tends to prefer smaller trees leading to lesser accuracy in some cases). The complexity of the data at hand has led us to prefer our extreme gradient boosting model; however, either would be reasonable choices in this scenario and lead to similar conclusions. Moving forward, we will report more detailed results for each of these models, save random forest, as well as results from the doubly robust method.
 </br>
 
 ### Bootstrapping
