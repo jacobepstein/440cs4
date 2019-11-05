@@ -162,7 +162,7 @@ spend_wealth = ggplot(debit, aes(y = spending1998, x = wealth, color = debit_car
   geom_point() +
   theme_minimal() +
   geom_smooth(method = "lm") +
-  labs(y = "1998 Spending", x = "Wealth", title = "Wealth vs. Spending")
+  labs(y = "1998 Spending", x = "Wealth", title = "Wealth vs. Spending", fill = "Debit Card?")
 
 spend_inc = ggplot(debit, aes(y = spending1998, x = income, color = debit_card1998))+
   geom_point() +
@@ -196,8 +196,7 @@ grid.arrange(arrangeGrob(spend_edu, spend_fam_size, ncol = 1), spend_wealth, nro
 
 We then examined relationships between demographic characteristics and 1998 spending. Some selected plots are shown above. Our initial analysis indicates that family size is positively associated with spending, which is intuitive given the cost of raising children. Additionally, families with household heads who have higher educational status tend to spend more than those headed by less educated individuals. This may be a function of income or wealth, as higher educated individuals tend to earn more; regardless, it is worth exploring further. Finally, both income and wealth are positively associated with spending, and households with debit cards tend to spend more at all levels of income and wealth. 
 
-We move forward with attempts to balance the covariates using matching, weighting and propensity scores as these plots illustrate significant differences in the covariates between the treatment and control groups. 
-y = "1998 Spending (% of Income)", x = "Geography")
+We move forward with attempts to balance the covariates using matching, weighting and propensity scores as these plots illustrate significant differences in the covariates between the treatment and control groups.
 
 
 ## Data Balancing
@@ -373,7 +372,7 @@ ATE_ipw_CART<-sum(olp.debit%>%filter(debit_card1998==TRUE)%>%pull(spending1998)/
 [TODO: Fix all loveplots, focus on matching]
 
 
-```{r}
+```{r, fig.height= 15, fig.width=12}
 #loveplots
 library(MatchIt)
 m.out_1 <- matchit(debit_card1998 ~ spending1995 + num_of_earners + average_age + family_size + geograph_area +  num_of_inhabitants + householder_age + householder_education + num_of_banks + interest_rate + income + wealth + cash_inventory, data = debit, method = "nearest", 
@@ -382,40 +381,47 @@ m.out_1 <- matchit(debit_card1998 ~ spending1995 + num_of_earners + average_age 
 m.out_3 <- matchit(debit_card1998 ~ spending1995 + num_of_earners + average_age + family_size + geograph_area +  num_of_inhabitants + householder_age + householder_education + num_of_banks + interest_rate + income + wealth + cash_inventory, data = debit, method = "nearest", 
                  ratio = 3,  replace = TRUE)
 
-love.plot(m.out_1,
+lp_one_one = love.plot(m.out_1,
           drop.distance = TRUE, 
           var.order = "unadjusted",
           line = TRUE, 
           threshold = .1,
-          stars = "raw") + labs(title = "1:1 Matching")
+          stars = "raw") + labs(title = "1:1 Matching") +
+  theme(legend.position = "none")
 
-love.plot(m.out_3,
+lp_one_three = love.plot(m.out_3,
           drop.distance = TRUE, 
           var.order = "unadjusted",
           line = TRUE, 
           threshold = .1,
-          stars = "raw") + labs(title = "1:3 Matching")
+          stars = "raw") + labs(title = "1:3 Matching") +
+  theme(axis.text.y = element_blank(), axis.ticks.y = element_blank(), axis.line.y = element_blank())
 
-love.plot(debit.basicLog_weight,
+lp_log = love.plot(debit.basicLog_weight,
           drop.distance = TRUE, 
           var.order = "unadjusted",
           line = TRUE, 
           threshold = .1,
-          stars = "raw") + labs(title = "Basic Logistic Weighting")
+          stars = "raw") + labs(title = "Basic Logistic Weighting") +
+  theme(legend.position = "none")
 
-love.plot(debit.randomForest_weight,
+lp_rf = love.plot(debit.randomForest_weight,
           drop.distance = TRUE, 
           var.order = "unadjusted",
           line = TRUE, 
           threshold = .1,
-          stars = "raw") + labs(title = "Random Forest Weighting")
+          stars = "raw") + labs(title = "Random Forest Weighting")  +
+  theme(axis.text.y = element_blank(), axis.ticks.y = element_blank(), axis.line.y = element_blank())
 
-love.plot(debit.CART_weight,
+
+lp_CART = love.plot(debit.CART_weight,
           drop.distance = TRUE, 
           var.order = "unadjusted",
           line = TRUE, 
           threshold = .1,
           stars = "raw") + labs(title = "CART Weighting")
+
+grid.arrange(lp_one_one, lp_one_three, lp_log, lp_rf, nrow = 2)
 ```
 
 
@@ -476,7 +482,7 @@ ori.df = as.data.frame(ori_asd)
 match.df1 = as.data.frame(match_asd_1)
 ori.match1.df = cbind(ori.df, match.df1)
 
-ggplot(data = ori.match1.df, aes(y = rownames(ori.match1.df))) + geom_point(aes(x = match_asd_1, colour = "matched")) + geom_point(aes(x = ori_asd, colour = "original")) + xlab("Absolute Standardized Difference") +ylab("Covariate")
+#ggplot(data = ori.match1.df, aes(y = rownames(ori.match1.df))) + geom_point(aes(x = match_asd_1, colour = "matched")) + geom_point(aes(x = ori_asd, colour = "original")) + xlab("Absolute Standardized Difference") +ylab("Covariate")
 
 
 #1:3
@@ -499,15 +505,17 @@ match_d_3<-apply(data.matrix(olp.debit[,-c(1,2,16:21)]),MARGIN=2,FUN=function(x)
 {abs(mean(x[treated3])-mean(x[control3]))})
 match_asd_3<-match_d_3/olp_sd3
 
-pdf("asd_compare.pdf",width=8,height=6)
-boxplot(ori_asd, match_asd_1, match_asd_3, weight_bl_asd, weight_rf_asd, weight_CART_asd, main="ASD for Different Methods",names=c("original", "1:1M", "1:3M", "Logistic Wt","RF Wt","CART Wt"),ylab="Abs Standardized Difference")
-dev.off()
-
+if(rewritePlots) {
+  pdf("asd_compare.pdf",width=8,height=6)
+  boxplot(ori_asd, match_asd_1, match_asd_3, weight_bl_asd, weight_rf_asd, weight_CART_asd, main="ASD for Different Methods",names=c("original", "1:1M", "1:3M", "Logistic Wt","RF Wt","CART   Wt"),ylab="Abs Standardized Difference")
+  dev.off()
+}
+  
 ori.df = as.data.frame(ori_asd)
 match.df3 = as.data.frame(match_asd_3)
 ori.match3.df = cbind(ori.df, match.df3)
 
-ggplot(data = ori.match3.df, aes(y = rownames(ori.match1.df))) + geom_point(aes(x = match_asd_1, colour = "matched")) + geom_point(aes(x = ori_asd, colour = "original")) + xlab("Absolute Standardized Difference") +ylab("Covariate")
+#ggplot(data = ori.match3.df, aes(y = rownames(ori.match1.df))) + geom_point(aes(x = match_asd_1, colour = "matched")) + geom_point(aes(x = ori_asd, colour = "original")) + xlab("Absolute Standardized Difference") +ylab("Covariate")
 ```
 [TODO: Add lines, categorical variables to matching love plots]
 
@@ -675,7 +683,7 @@ ATT_DR<-mean(olp.debit[treated1,]$spending1998, na.rm = TRUE)-sum((olp.debit_mod
 ATE_DR <-mean(olp.debit$debit_card1998*olp.debit$spending1998/olp.debit$ps_basicLog)-mean((olp.debit_modelling$debit_card1998-olp.debit_modelling$ps_basicLog)*predict(model_treated,newdata=olp.debit_modelling,type="response")/olp.debit_modelling$ps_basicLog)-mean((1-olp.debit_modelling$debit_card1998)*olp.debit_modelling$spending1998/(1-olp.debit_modelling$ps_basicLog))-mean((olp.debit_modelling$debit_card1998-olp.debit_modelling$ps_basicLog)*predict(model_control,newdata=olp.debit_modelling,type="response")/(1-olp.debit_modelling$ps_basicLog))
 ```
 
-```{r}
+```{r, eval = FALSE}
 #Bootstrap to Get the Variance
 
 B=500
