@@ -9,7 +9,7 @@ output:
 ---
 ```{r, echo = FALSE, message = FALSE}
 # !diagnostics off
-knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE)
+knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE, eval = FALSE)
 ```
 
 ```{r}
@@ -47,7 +47,6 @@ The goal of this case study is to evaluate the causal impact of debit card owner
 
 ```{r, fig.width=15, fig.height=7, warning=FALSE, message=FALSE}
 # simple spending, 95 v 98
-
 
 spend95 = ggplot(debit, aes(x = spending1995, fill = debit_card1998)) +
   geom_density(alpha = 0.5, show.legend = FALSE) +
@@ -500,6 +499,27 @@ outcome_formula = function()
   return(spending1998 ~ spending1995 + num_of_earners + average_age + family_size + geograph_area + num_of_inhabitants + householder_age + householder_education + num_of_banks + interest_rate + income + wealth + cash_inventory)
 }
 
+
+#Regression Adjustment with Linear Model before matching
+controls = debit %>% filter(debit_card1998 == 0)
+treats = debit %>% filter(debit_card1998 == 1)
+
+#Models
+model_control <- glm(outcome_formula(), data = debit %>% filter(debit_card1998 == 0))
+model_treated <- glm(outcome_formula(), data = debit %>% filter(debit_card1998 == 1))
+
+#ATT
+mu1 = predict(model_control, newdata=debit %>% filter(debit_card1998 == 1), type = "response") 
+
+ATT_lin_reg <- mean(treats$spending1998-mu1)
+
+ATE_lin_reg<-(sum(treats$spending1998-predict(model_control,newdata = treats,type="response"))-
+  sum(controls$spending1998-predict(model_treated,newdata =
+                                      controls,type="response")))/dim(debit)[1]
+
+
+# Use 1:1 Matching moving forward
+
 controls = olp.debit[ATT_matching_1$index.control, ]
 control_X = controls[, -c(1,2,16:21)]
 control_Y = controls$spending1998
@@ -509,7 +529,7 @@ treat_X = treats[,-c(1,2,16:21)]
 treat_Y = treats$spending1998
 
 
-#Regression Adjustment with Linear Model
+#Regression Adjustment with Linear Model on top of 1:1 matching
 
 #Models
 model_control <- lm(outcome_formula(), data = controls)
@@ -569,16 +589,30 @@ mu5=predict(model_treat_forest,newdata=control_X,type="response")
 mu6=predict(model_treat_forest,newdata=treat_X,type="response")
 ATE_mix_forest=ATE_matching_1$est-(-sum(mu3)+sum(mu4)-sum(mu5)+sum(mu6))/(dim(olp.debit)[1])
 
-# data.frame(ATT_mix,
-#       ATE_mix,
-#       ATT_mix_boost, 
-#       ATE_mix_boost, ATT_mix_forest, ATE_mix_forest)
+data.frame(
+  ATT_lin_reg, ATE_lin_reg,
+  ATT_mix, ATE_mix,
+  ATT_mix_boost, ATE_mix_boost, 
+  ATT_mix_forest, ATE_mix_forest
+  )
 ```
 
+The motivation for regression adjustment is to impute missing potential outcomes by fitting models to the unobserved counterparts of observed data subsets. We have elected to include a regression adjustment in addition to our propensity score matching as it allows us to mitigate the sensitivity of our models to the model specification used to impute these unobsereved values, specifically as it pertains to the covariate imbalance.
+</br>
+As described above, our 1:1 matched data has demonstrated the most compelling distribution of absolute standardised difference, and therefore yields the most strongest results for the overlap of data through a propensity score methodology. Thus we partitioned the data into treatment and control groups through the 1:1 mathcing method, and then imputed unobserved control values for the observed treatment values, and vice versa for the observed control values.
+</br>
+We began testing our models by running a simple linear (OLS) model on the original unmatched dataset. The results of this test proved unfruitful as the ATT for this model was lower than the corresponding ATE. This suggests that the effect of individuals who were observed to own debit cards in 1998 spent on average 185 more than those who did not. Furthermore, the unmatched model suggests that after imputing control values for those who did own a debit card in 1998, that the implied treatment effect increased to 218 in spending. Ergo, the model implies that those who recieved the treatment would have spent less than those in the corresponding observed control group. Intutively, this reinforces our intuition to use the matched data as it would allow our model to account for unoberserved confounders better, and therfore allowing for stronger causal inference
+</br>
+As illustrated by the table above, the ATT is higher than the ATE across all models that were built with the 1:1 matched data. Intutively, this suggests that matching enabled us to obviate a case of Simpson's Paradox as the unmatched model demonstrated the opposite intuition.
+</br>
+In terms of the flexibility of our models, the machine learning models (the gradient boost and random forest) are intrinsically more flexible than our OLS model as they learn from previous errors by design. That being said, it somewhat cumbersome to ascertain which of our machine learning models is in fact more flexible. The forest is useful as it is easier to fit as it only depends on the number of trees and the number of factors selected; in addition, the forest does not overfit the data as much as the boosted model. Nevertheless, the boosted model is also compelling as it is capable of optimising a broader selection of objective function than the forest, and typically leads to more accuracy with fewer trees. The complexity of the data at hand has led us to prefer our boosted model, which yielded the highest ATT (286) and ATE (169).
+</br>
+
+In order to estimate the error and significance of our models for ATT and ATE, we generate 500 bootstrap samples of the data,. Using the bootstrap samples, we recalculated the propensity scores and estimated the resulting causal effects for each dataset accordingly. In our bootstrapping process, we evaluated both the ATT and ATE for weighting, weighting with double robustness, 1:1 matching with our linear model, and 1:1 matching with our gradient boosted model.
 ```{r}
 #Double Robustness
-#ATT DR
 
+#Model
 olp.debit_modelling <- olp.debit %>% filter(num_of_earners != 5) %>% filter(family_size != 6) %>% filter(family_size != 7)
 
 
@@ -589,15 +623,11 @@ ATT_DR<-mean(olp.debit[treated1,]$spending1998, na.rm = TRUE)-sum((olp.debit_mod
 ATE_DR <-mean(olp.debit$debit_card1998*olp.debit$spending1998/olp.debit$ps_basicLog)-mean((olp.debit_modelling$debit_card1998-olp.debit_modelling$ps_basicLog)*predict(model_treated,newdata=olp.debit_modelling,type="response")/olp.debit_modelling$ps_basicLog)-mean((1-olp.debit_modelling$debit_card1998)*olp.debit_modelling$spending1998/(1-olp.debit_modelling$ps_basicLog))-mean((olp.debit_modelling$debit_card1998-olp.debit_modelling$ps_basicLog)*predict(model_control,newdata=olp.debit_modelling,type="response")/(1-olp.debit_modelling$ps_basicLog))
 ```
 
-[TODO: Writeup bootstrapping]
-
-
-
 ```{r}
 #Bootstrap to Get the Variance
 
 B=500
-b_IPW1<-b_IPW2<-numeric(B)
+b_IPW1<-b_IPW2<-b_ATT_lin_reg<-b_ATE_lin_reg<-numeric(B)
 b_DR1<-b_DR2<-b_mix1<-b_mix2<-b_mix1_boost<-b_mix2_boost<-b_mix1_forest<-b_mix2_forest<-numeric(B)
 for (i in (1:B))
 {
@@ -639,6 +669,21 @@ for (i in (1:B))
       control<-b_ATT_matching_m$index.control
       treat_size<-length(treated)
       control_size<-dim(bdata)[1]-treat_size
+      
+      #Regression Adjustment with Linear Model before matching
+      controls = bdata %>% filter(debit_card1998 == 0)
+      treats = bdata %>% filter(debit_card1998 == 1)
+      #Models
+      model_control <- glm(outcome_formula(), data = debit %>% filter(debit_card1998 == 0))
+      model_treated <- glm(outcome_formula(), data = debit %>% filter(debit_card1998 == 1))
+
+      #ATT
+      mu1 = predict(model_control, newdata=debit %>% filter(debit_card1998 == 1), type = "response") 
+      
+      b_ATT_lin_reg[i] <- mean(treats$spending1998-mu1)
+      
+      b_ATE_lin_reg[i]<-(sum(treats$spending1998-predict(model_control,newdata = treats,type="response"))-
+        sum(controls$spending1998-predict(model_treated,newdata = controls,type="response")))/dim(bdata)[1]
       
       #ATT: Matching with regression
       b_control <- lm(outcome_formula(), data = bdata[control,])
@@ -739,33 +784,36 @@ for (i in (1:B))
 }
 
 #Calculate Bootstrap Variance and SD
+ATT_SD_lin_reg<-sqrt(var(b_ATT_lin_reg))
 ATT_SD_IPW<-sqrt(var(b_IPW1))
 ATT_SD_DR<-sqrt(var(b_DR1))
 ATT_SD_Mix<-sqrt(var(b_mix1))
 ATT_SD_Mix_boost<-sqrt(var(b_mix1_boost))
 # ATT_SD_Mix_forest<-sqrt(var(b_mix1_forest))
 
+ATE_SD_lin_reg<-sqrt(var(b_ATE_lin_reg))
 ATE_SD_IPW<-sqrt(var(b_IPW2))
 ATE_SD_DR<-sqrt(var(b_DR2))
 ATE_SD_Mix<-sqrt(var(b_mix2))
 ATE_SD_Mix_boost<-sqrt(var(b_mix2_boost))
 # ATE_SD_Mix_forest<-sqrt(var(b_mix2_forest))
 
-table = xtable(rbind(c(ATE_ipw_bl,ATE_DR,ATE_mix,ATE_mix_boost),
-c(ATE_SD_IPW,ATE_SD_DR,ATE_SD_Mix,ATE_SD_Mix_boost),
-c(ATT_ipw_bl,ATT_DR,ATT_mix,ATT_mix_boost),
-c(ATT_SD_IPW,ATT_SD_DR,ATT_SD_Mix,ATT_SD_Mix_boost)),digits=4)
 
-# Get only those that worked
-ATT_SD_IPW<-ATT_SD_IPW[ATT_SD_IPW != 0]
-ATT_SD_DR<-ATT_SD_IPW[ATT_SD_IPW != 0]
-ATT_SD_Mix<-ATT_SD_IPW[ATT_SD_IPW != 0]
-ATT_SD_Mix_boost<-ATT_SD_IPW[ATT_SD_IPW != 0]
-
-ATT = c(ATT_ipw_bl,ATT_DR,ATT_mix,ATT_mix_boost) %>%unlist()
-ATT_SD = c(ATT_SD_IPW,ATT_SD_DR,ATT_SD_Mix,ATT_SD_Mix_boost) %>%unlist()
+ATT = c(ATT_lin_reg, ATT_ipw_bl,ATT_DR,ATT_mix,ATT_mix_boost) %>%unlist()
+ATT_SD = c(ATT_SD_lin_reg, ATT_SD_IPW,ATT_SD_DR,ATT_SD_Mix,ATT_SD_Mix_boost) %>%unlist()
 AOT = debit %>% filter(debit_card1998 == 1) %>% dplyr::select(spending1998) %>% summarize(mean = mean(spending1998))
-AOT_over_AOT = ATT / AOT %>% unlist %>%as.numeric()
+ATT_over_AOT = ATT / AOT %>% unlist %>%as.numeric()
+
+z_score = ATT/ATT_SD 
+
+p_value = pnorm(-z_score)
+
+table = xtable(rbind(c(ATE_lin_reg,ATE_ipw_bl,ATE_DR,ATE_mix,ATE_mix_boost),
+c(ATE_SD_lin_reg, ATE_SD_IPW,ATE_SD_DR,ATE_SD_Mix,ATE_SD_Mix_boost),
+c(ATT_lin_reg, ATT_ipw_bl,ATT_DR,ATT_mix,ATT_mix_boost),
+c(ATT_SD_lin_reg, ATT_SD_IPW,ATT_SD_DR,ATT_SD_Mix,ATT_SD_Mix_boost), ATT_over_AOT, p_value),digits=6)
+
+table
 
 #pdf("Residual_check.pdf",height=5,width=10)
 #par(mfrow=c(1,2))
@@ -777,5 +825,8 @@ AOT_over_AOT = ATT / AOT %>% unlist %>%as.numeric()
 ## Conclusions
 ![](xtable.png)
 
+The results of bootstrapping support our aforementioned belief in the gradient boosted model. As portrayed in the table above, the boosted model was the most significant (as estimated by the model's p-value) and has the lowest estimated (via bootstrapping) standard deviation for ATE across all models explored. Interestingly, the boosted model did have the highest bootstrap estimate for ATE standard deviation, however given the desirability of the model's other metrics and the flexibility of the model holistically, we continue to endorse the gradient boosted model as our model of choice.
+</br>
+Overall, our investigation into the effects of debit card ownership on spending has demonstrated that there is in fact a positive treatment effect associated with owning a debit card in 1998. While it may prove difficult to extrapolate the results of this study to other geographies and time periods, we believe that through implementing 1:1 matching and regression adjustments with flexible machine learning models we have achieved the ability to draw some causal inference. Namely, we estimate the ATT to be approximately 286 and the ATE to be approximately 169.
 
-[TODO: Add interpretations and conclusions of above table]
+
