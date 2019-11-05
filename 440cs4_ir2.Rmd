@@ -375,27 +375,49 @@ ATE_ipw_CART<-sum(olp.debit%>%filter(debit_card1998==TRUE)%>%pull(spending1998)/
 
 ```{r}
 #loveplots
+library(MatchIt)
+m.out_1 <- matchit(debit_card1998 ~ spending1995 + num_of_earners + average_age + family_size + geograph_area +  num_of_inhabitants + householder_age + householder_education + num_of_banks + interest_rate + income + wealth + cash_inventory, data = debit, method = "nearest", 
+                 ratio = 1,  replace = TRUE)
+
+m.out_3 <- matchit(debit_card1998 ~ spending1995 + num_of_earners + average_age + family_size + geograph_area +  num_of_inhabitants + householder_age + householder_education + num_of_banks + interest_rate + income + wealth + cash_inventory, data = debit, method = "nearest", 
+                 ratio = 3,  replace = TRUE)
+
+love.plot(m.out_1,
+          drop.distance = TRUE, 
+          var.order = "unadjusted",
+          line = TRUE, 
+          threshold = .1,
+          stars = "raw") + labs(title = "1:1 Matching")
+
+love.plot(m.out_3,
+          drop.distance = TRUE, 
+          var.order = "unadjusted",
+          line = TRUE, 
+          threshold = .1,
+          stars = "raw") + labs(title = "1:3 Matching")
+
 love.plot(debit.basicLog_weight,
           drop.distance = TRUE, 
           var.order = "unadjusted",
           line = TRUE, 
           threshold = .1,
-          stars = "raw")
+          stars = "raw") + labs(title = "Basic Logistic Weighting")
 
 love.plot(debit.randomForest_weight,
           drop.distance = TRUE, 
           var.order = "unadjusted",
           line = TRUE, 
           threshold = .1,
-          stars = "raw")
+          stars = "raw") + labs(title = "Random Forest Weighting")
 
 love.plot(debit.CART_weight,
           drop.distance = TRUE, 
           var.order = "unadjusted",
           line = TRUE, 
           threshold = .1,
-          stars = "raw")
+          stars = "raw") + labs(title = "CART Weighting")
 ```
+
 
 ```{r}
 
