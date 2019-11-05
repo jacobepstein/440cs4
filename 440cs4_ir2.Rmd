@@ -48,7 +48,6 @@ The goal of this case study is to evaluate the causal impact of debit card owner
 ```{r, fig.width=15, fig.height=7, warning=FALSE, message=FALSE}
 # simple spending, 95 v 98
 
-
 spend95 = ggplot(debit, aes(x = spending1995, fill = debit_card1998)) +
   geom_density(alpha = 0.5, show.legend = FALSE) +
   labs(title = "1995 Household Spending", fill = "Debit Card?", x = "Monthly Average Spending ($)", y = "Density") +
@@ -500,9 +499,11 @@ outcome_formula = function()
   return(spending1998 ~ spending1995 + num_of_earners + average_age + family_size + geograph_area + num_of_inhabitants + householder_age + householder_education + num_of_banks + interest_rate + income + wealth + cash_inventory)
 }
 
+
 #Regression Adjustment with Linear Model before matching
 controls = debit %>% filter(debit_card1998 == 0)
 treats = debit %>% filter(debit_card1998 == 1)
+
 #Models
 model_control <- glm(outcome_formula(), data = debit %>% filter(debit_card1998 == 0))
 model_treated <- glm(outcome_formula(), data = debit %>% filter(debit_card1998 == 1))
@@ -513,7 +514,8 @@ mu1 = predict(model_control, newdata=debit %>% filter(debit_card1998 == 1), type
 ATT_lin_reg <- mean(treats$spending1998-mu1)
 
 ATE_lin_reg<-(sum(treats$spending1998-predict(model_control,newdata = treats,type="response"))-
-  sum(controls$spending1998-predict(model_treated,newdata = controls,type="response")))/dim(debit)[1]
+  sum(controls$spending1998-predict(model_treated,newdata =
+                                      controls,type="response")))/dim(debit)[1]
 
 
 # Use 1:1 Matching moving forward
@@ -587,11 +589,19 @@ mu5=predict(model_treat_forest,newdata=control_X,type="response")
 mu6=predict(model_treat_forest,newdata=treat_X,type="response")
 ATE_mix_forest=ATE_matching_1$est-(-sum(mu3)+sum(mu4)-sum(mu5)+sum(mu6))/(dim(olp.debit)[1])
 
-# data.frame(ATT_mix,
-#       ATE_mix,
-#       ATT_mix_boost, 
-#       ATE_mix_boost, ATT_mix_forest, ATE_mix_forest)
+data.frame(
+  ATT_lin_reg, ATE_lin_reg,
+  ATT_mix, ATE_mix,
+  ATT_mix_boost, ATE_mix_boost, 
+  ATT_mix_forest, ATE_mix_forest
+  )
 ```
+
+The motivation for regression adjustment is to impute missing potential outcomes by fitting models to the unobserved counterparts of observed data subsets. We have elected to include a regression adjustment in addition to our propensity score matching as it allows us to mitigate the sensitivity of our models to the model specification used to impute these unobsereved values, specifically as it pertains to the covariate imbalance.
+<\br>
+As described above, our 1:1 matched data has demonstrated the most compelling distribution of absolute standardised difference, and therefore yields the most strongest results for the overlap of data through a propensity score methodology. Thus we partitioned the data These results provide our models with data that requires less imputation and XXX.
+<\br>
+ As illustrated by the table above, the ATT is higher than the ATE across all models. This is XXX.
 
 ```{r}
 #Double Robustness
@@ -606,10 +616,6 @@ ATT_DR<-mean(olp.debit[treated1,]$spending1998, na.rm = TRUE)-sum((olp.debit_mod
 #ATE DR
 ATE_DR <-mean(olp.debit$debit_card1998*olp.debit$spending1998/olp.debit$ps_basicLog)-mean((olp.debit_modelling$debit_card1998-olp.debit_modelling$ps_basicLog)*predict(model_treated,newdata=olp.debit_modelling,type="response")/olp.debit_modelling$ps_basicLog)-mean((1-olp.debit_modelling$debit_card1998)*olp.debit_modelling$spending1998/(1-olp.debit_modelling$ps_basicLog))-mean((olp.debit_modelling$debit_card1998-olp.debit_modelling$ps_basicLog)*predict(model_control,newdata=olp.debit_modelling,type="response")/(1-olp.debit_modelling$ps_basicLog))
 ```
-
-[TODO: Writeup bootstrapping]
-
-
 
 ```{r}
 #Bootstrap to Get the Variance
@@ -807,6 +813,9 @@ c(ATT_SD_lin_reg, ATT_SD_IPW,ATT_SD_DR,ATT_SD_Mix,ATT_SD_Mix_boost), ATT_over_AO
 #plot(fitted(model_control),residuals.gam(model_control),ylab="residual",xlab="fitted value (Treated Model)")
 #dev.off()
 ```
+
+[TODO: Writeup bootstrapping]
+
 
 ## Conclusions
 ![](xtable.png)
