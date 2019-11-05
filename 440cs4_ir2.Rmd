@@ -674,8 +674,10 @@ In terms of the flexibility of our three models, the machine learning models (th
 </br>
 
 ### Bootstrapping
-In order to estimate the error and significance of our models for ATT and ATE, we generated 500 bootstrap samples of the data. Using these bootstrap samples, we recalculated the propensity scores and estimated the resulting causal effects for each dataset accordingly. In our bootstrapping process, we evaluated both the ATT and ATE for weighting, weighting with double robustness, regression adjustment with a linear model, 1:1 matching with a linear regression adjustment, and 1:1 matching with a gradient boosted regression adjustment.
+In order to estimate the error and significance of our models for ATT and ATE, we generated 500 bootstrap samples of the data. Using these bootstrap samples, we recalculated the propensity scores and estimated the resulting causal effects for each dataset accordingly. In our bootstrapping process, we evaluated both the ATT and ATE for weighting, weighting with double robustness, regression adjustment with a linear model, 1:1 matching with a linear regression adjustment, and 1:1 matching with a gradient boosted regression adjustment. 
+</br>
 
+Although bootstrapping is computationally intensive, we chose it over the more efficient delta method in order to avoid underestimating the uncertainty.
 ```{r}
 #Double Robustness
 
